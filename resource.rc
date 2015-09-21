@@ -1,0 +1,199 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+//#include "afxres.h"
+#include <windows.h>
+#define IDC_STATIC -1
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Japanese (Japan) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_JPN)
+LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
+#pragma code_page(932)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MENU1 MENU
+BEGIN
+    POPUP "ファイル(&F)"
+    BEGIN
+        MENUITEM "SAVEMQO",                     ID_MNU_SAVE
+        MENUITEM "SAVEX",                       ID_MNU_SAVEX
+        MENUITEM "終了(&X)",                      ID_MNU_EXIT
+    END
+    POPUP "ウィンドウ(&W)"
+    BEGIN
+        MENUITEM "種族・装備",                       ID_MNU_INVENT
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1               ICON                    "icon1.ico"
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DIALOG2 DIALOGEX 5, 100, 153, 314
+STYLE DS_SETFONT | DS_MODALFRAME | DS_SETFOREGROUND | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "種族・装備等"
+FONT 8, "ＭＳ Ｐゴシック", 400, 0, 0x80
+BEGIN
+    RTEXT           "種族",IDC_STATIC,5,67,16,13,SS_CENTERIMAGE
+    RTEXT           "顔",IDC_STATIC,9,87,12,13,SS_CENTERIMAGE
+    RTEXT           "頭",IDC_STATIC,11,107,10,13,SS_CENTERIMAGE
+    RTEXT           "胴",IDC_STATIC,13,129,8,13,SS_CENTERIMAGE
+    RTEXT           "両手",IDC_STATIC,6,149,15,13,SS_CENTERIMAGE
+    RTEXT           "両脚",IDC_STATIC,6,169,15,13,SS_CENTERIMAGE
+    RTEXT           "両足",IDC_STATIC,6,189,15,13,SS_CENTERIMAGE
+    RTEXT           "右手",IDC_STATIC,7,221,15,13,SS_CENTERIMAGE
+    RTEXT           "左手",IDC_STATIC,7,239,15,13,SS_CENTERIMAGE
+    RTEXT           "遠隔",IDC_STATIC,7,255,15,13,SS_CENTERIMAGE
+    GROUPBOX        "装備等",IDC_STATIC,5,55,134,154
+    GROUPBOX        "武器等",IDC_STATIC,5,209,134,66
+    COMBOBOX        IDC_COMBO1,29,68,106,243,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO2,29,88,106,223,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO3,29,108,106,203,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO4,29,130,106,181,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO5,29,149,106,149,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO6,29,171,106,140,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO7,29,191,106,166,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO10,28,219,108,169,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO11,28,237,108,160,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO12,28,255,108,127,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO31,26,283,111,169,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "PC",IDC_RADIO8,"Button",BS_AUTORADIOBUTTON,8,12,20,8
+    CONTROL         "NPC",IDC_RADIO9,"Button",BS_AUTORADIOBUTTON,31,12,25,8
+    GROUPBOX        "NPC",IDC_STATIC,5,277,134,23
+    LTEXT           "PC",IDC_STATIC,60,29,10,8
+    LTEXT           "NPC",IDC_STATIC,102,30,15,8
+    CONTROL         "Bone",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,65,11,29,10
+    CONTROL         "wire",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,100,11,22,10
+    COMBOBOX        IDC_COMBO8,57,40,41,259,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_COMBO9,101,40,38,259,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Def",IDC_RADIO1,"Button",BS_AUTORADIOBUTTON,9,27,24,10
+    CONTROL         "Att",IDC_RADIO2,"Button",BS_AUTORADIOBUTTON,9,41,24,10
+    GROUPBOX        "Motion",IDC_STATIC,6,21,50,34,0,WS_EX_RIGHT
+    CONTROL         "Em",IDC_RADIO3,"Button",BS_AUTORADIOBUTTON,32,27,24,10
+    CONTROL         "WS",IDC_RADIO4,"Button",BS_AUTORADIOBUTTON,31,41,24,10
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_DIALOG2, DIALOG
+    BEGIN
+        LEFTMARGIN, 6
+        RIGHTMARGIN, 140
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 302
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041104b0"
+        BEGIN
+            VALUE "CompanyName", "HOME"
+            VALUE "FileDescription", "ewhModel"
+            VALUE "FileVersion", "1, 0, 0, 1"
+            VALUE "InternalName", "ewhModel"
+            VALUE "LegalCopyright", "Copyright (C) 2004"
+            VALUE "OriginalFilename", "ewhModel.exe"
+            VALUE "ProductName", "HOME ewhModel"
+            VALUE "ProductVersion", "1, 0, 0, 1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x411, 1200
+    END
+END
+
+#endif    // Japanese (Japan) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
