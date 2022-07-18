@@ -444,6 +444,7 @@ CStream::CStream()
 	m_FaceCount		= 0;
 	m_DispLevel		= 0;
 	m_texNo			= 0;
+	m_Level = 0;
 }
 
 //======================================================================
@@ -599,6 +600,7 @@ CMesh::CMesh()
 	m_lpIB					= NULL;
 	m_lpVB1					= NULL;
 	m_lpVB2					= NULL;
+	m_DispCheck				= 0;
 	m_NumIndex = m_NumVertices = m_NumFaces = m_VBSize = m_IBSize = m_FVF = 0;
 	m_Stnum					= 0;
 	m_Streams.Init();
@@ -932,10 +934,10 @@ void CMesh::SetMeshBone( int Num1, int Num2, WORD Type, WORD BoneTblNum, WORD *p
 {
 	int		bidx,ii,jj;
 
-	m_pBoneTbl = new WORD[BoneTblNum];
-	m_pBoneTblNum = new DWORD[BoneTblNum];
-	memset(m_pBoneTbl,0,BoneTblNum*sizeof(WORD));
-	memset(m_pBoneTblNum,0,BoneTblNum*sizeof(DWORD));
+	m_pBoneTbl = new WORD[BoneTblNum]();
+	m_pBoneTblNum = new DWORD[BoneTblNum]();
+//	memset(m_pBoneTbl,0,BoneTblNum*sizeof(WORD));
+//	memset(m_pBoneTblNum,0,BoneTblNum*sizeof(DWORD));
 	m_mBoneNum =0;
 	if( Type&0x80 ) {
 		m_mBoneNum = BoneTblNum;
@@ -966,7 +968,7 @@ void CMesh::SetMeshBone( int Num1, int Num2, WORD Type, WORD BoneTblNum, WORD *p
 				bidx >>= 7; bidx &= 0x7f;
 			}
 			for( jj=0 ; jj<m_mBoneNum ; jj++ ) {
-				if( bidx == m_pBoneTbl[jj] ) {
+				if( (WORD)bidx == m_pBoneTbl[jj] ) {
 					m_pBoneTblNum[jj]++;
 					break;
 				}
@@ -1036,9 +1038,9 @@ HRESULT CMesh::LoadMesh( char *pFile, CModel *pModel, unsigned long FVF,int Flip
 	NumFaces	=	0;
 	NumIndex	=	0;
 	addpos		=	0;
-	pUVidx		= new int[NumVertices*10];
-	pUTemp		= new float[NumVertices*10];
-	pVTemp		= new float[NumVertices*10];
+	pUVidx		= new int[NumVertices*10](); //初期化（）
+	pUTemp		= new float[NumVertices*10]();
+	pVTemp		= new float[NumVertices*10]();
 	for( int i=0 ; i<NumVertices ; i++ ) pUVidx[i] = -1;
 	Renumber = NumVertices;
 #pragma pack(push,2)
@@ -1903,7 +1905,20 @@ void CMotionFrame::InitData( void )
 
 int CMotionFrame::SetMotionName( char *MotionName )
 {
-	strncpy(m_Name,MotionName,4);m_Name[4]='\0';
+	char tmp;
+	strncpy( m_Name, MotionName, 4); m_Name[4] = '\0';
+	if (isdigit(m_Name[0])) {
+		if (isdigit(m_Name[1])) {
+			tmp = m_Name[0];
+			m_Name[0] = m_Name[2];
+			m_Name[2] = tmp;
+		}
+		else {
+			tmp = m_Name[0];
+			m_Name[0] = m_Name[1];
+			m_Name[1] = tmp;
+		}
+	}
 	return 0;
 }
 //======================================================================
@@ -2023,7 +2038,7 @@ void CMotionElement::LoadMotion(int No, int Keys,
 	// 回転
 	//-----------------------------------------------------
 	m_RotationKeyNum = Keys;
-	m_pRotationKeys = new KEYROTATION [ Keys ];
+	m_pRotationKeys = new KEYROTATION [ Keys ]();
 	for ( int i = 0; i < Keys ; i++ )
 	{
 		m_pRotationKeys[i].Time		= unsigned long(1.f/Times*100*i);
@@ -2036,7 +2051,7 @@ void CMotionElement::LoadMotion(int No, int Keys,
 	// スケール
 	//-----------------------------------------------------
 	m_ScalingKeyNum = Keys;
-	m_pScalingKeys = new KEYSCALING [ Keys ];
+	m_pScalingKeys = new KEYSCALING [ Keys ]();
 	for ( int i = 0; i < Keys ; i++ )
 	{
 		m_pScalingKeys[i].Time		= unsigned long(1.f/Times*100*i);
@@ -2048,7 +2063,7 @@ void CMotionElement::LoadMotion(int No, int Keys,
 	// 移動
 	//-----------------------------------------------------
 	m_TranslateKeyNum = Keys;
-	m_pTranslateKeys = new KEYTRANSLATION [ Keys ];
+	m_pTranslateKeys = new KEYTRANSLATION [ Keys ]();
 	for ( int i = 0; i < Keys ; i++ )
 	{
 		m_pTranslateKeys[i].Time	= unsigned long(1.f/Times*100*i);
@@ -2088,13 +2103,13 @@ void CMotionElement::AddMotion(int No, int Keys,
 	// 回転
 	//-----------------------------------------------------
 	RotationKeyNum	= m_RotationKeyNum;
-	pRotationKeys	= new KEYROTATION [RotationKeyNum];
+	pRotationKeys	= new KEYROTATION [RotationKeyNum]();
 	for( i=0 ; i<RotationKeyNum ; i++ ) {
 		pRotationKeys[i] = m_pRotationKeys[i];
 	}
 	SAFE_DELETES( m_pRotationKeys );
 	m_RotationKeyNum = RotationKeyNum + Keys;
-	m_pRotationKeys = new KEYROTATION [ m_RotationKeyNum ];
+	m_pRotationKeys = new KEYROTATION [ m_RotationKeyNum ]();
 	for( i=0 ; i<RotationKeyNum ; i++ ) {
 		m_pRotationKeys[i] = pRotationKeys[i];
 	}
@@ -2113,13 +2128,13 @@ void CMotionElement::AddMotion(int No, int Keys,
 	// スケール
 	//-----------------------------------------------------
 	ScalingKeyNum	= m_ScalingKeyNum;
-	pScalingKeys	= new KEYSCALING [ScalingKeyNum];
+	pScalingKeys	= new KEYSCALING [ScalingKeyNum]();
 	for( i=0 ; i<ScalingKeyNum ; i++ ) {
 		pScalingKeys[i] = m_pScalingKeys[i];
 	}
 	SAFE_DELETES( m_pScalingKeys );
 	m_ScalingKeyNum = ScalingKeyNum + Keys;
-	m_pScalingKeys = new KEYSCALING [ m_ScalingKeyNum ];
+	m_pScalingKeys = new KEYSCALING [ m_ScalingKeyNum ]();
 	for( i=0 ; i<ScalingKeyNum ; i++ ) {
 		m_pScalingKeys[i] = pScalingKeys[i];
 	}
@@ -2136,13 +2151,13 @@ void CMotionElement::AddMotion(int No, int Keys,
 	// 移動
 	//-----------------------------------------------------
 	TranslateKeyNum	= m_TranslateKeyNum;
-	pTranslateKeys	= new KEYTRANSLATION [TranslateKeyNum];
+	pTranslateKeys	= new KEYTRANSLATION [TranslateKeyNum]();
 	for( i=0 ; i<TranslateKeyNum ; i++ ) {
 		pTranslateKeys[i] = m_pTranslateKeys[i];
 	}
 	SAFE_DELETES( m_pTranslateKeys );
 	m_TranslateKeyNum = TranslateKeyNum + Keys;
-	m_pTranslateKeys = new KEYTRANSLATION [ m_TranslateKeyNum ];
+	m_pTranslateKeys = new KEYTRANSLATION [ m_TranslateKeyNum ]();
 	for( i=0 ; i<TranslateKeyNum ; i++ ) {
 		m_pTranslateKeys[i] = pTranslateKeys[i];
 	}
@@ -2172,7 +2187,7 @@ bool CMotionElement::CopyMotionElement( CMotionElement *pAnimElement )
 	// 回転
 	//-----------------------------------------------------
 	m_RotationKeyNum = pAnimElement->m_RotationKeyNum;
-	m_pRotationKeys = new KEYROTATION [ m_RotationKeyNum ];
+	m_pRotationKeys = new KEYROTATION [ m_RotationKeyNum ]();
 	for ( i = 0; i < m_RotationKeyNum ; i++ ) {
 		m_pRotationKeys[i]		= pAnimElement->m_pRotationKeys[i];
 	}
@@ -2180,7 +2195,7 @@ bool CMotionElement::CopyMotionElement( CMotionElement *pAnimElement )
 	// スケール
 	//-----------------------------------------------------
 	m_ScalingKeyNum = pAnimElement->m_ScalingKeyNum;
-	m_pScalingKeys = new KEYSCALING [ m_ScalingKeyNum ];
+	m_pScalingKeys = new KEYSCALING [ m_ScalingKeyNum ]();
 	for ( i = 0; i < m_ScalingKeyNum ; i++ ) {
 		m_pScalingKeys[i]		= pAnimElement->m_pScalingKeys[i];
 	}
@@ -2188,7 +2203,7 @@ bool CMotionElement::CopyMotionElement( CMotionElement *pAnimElement )
 	// 移動
 	//-----------------------------------------------------
 	m_TranslateKeyNum = pAnimElement->m_TranslateKeyNum;
-	m_pTranslateKeys = new KEYTRANSLATION [ m_TranslateKeyNum ];
+	m_pTranslateKeys = new KEYTRANSLATION [ m_TranslateKeyNum ]();
 	for ( i = 0; i < m_TranslateKeyNum ; i++ ) {
 		m_pTranslateKeys[i]	= pAnimElement->m_pTranslateKeys[i];
 	}
@@ -2213,13 +2228,13 @@ bool CMotionElement::AddMotionElement( CMotionElement *pAnimElement )
 	// 回転
 	//-----------------------------------------------------
 	RotationKeyNum	= m_RotationKeyNum;
-	pRotationKeys	= new KEYROTATION [RotationKeyNum];
+	pRotationKeys	= new KEYROTATION [RotationKeyNum]();
 	for( i=0 ; i<RotationKeyNum ; i++ ) {
 		pRotationKeys[i] = m_pRotationKeys[i];
 	}
 	SAFE_DELETES( m_pRotationKeys );
 	m_RotationKeyNum = RotationKeyNum + pAnimElement->m_RotationKeyNum;
-	m_pRotationKeys = new KEYROTATION [ m_RotationKeyNum ];
+	m_pRotationKeys = new KEYROTATION [ m_RotationKeyNum ]();
 	for( i=0 ; i<RotationKeyNum ; i++ ) {
 		m_pRotationKeys[i] = pRotationKeys[i];
 	}
@@ -2234,13 +2249,13 @@ bool CMotionElement::AddMotionElement( CMotionElement *pAnimElement )
 	// スケール
 	//-----------------------------------------------------
 	ScalingKeyNum	= m_ScalingKeyNum;
-	pScalingKeys	= new KEYSCALING [ScalingKeyNum];
+	pScalingKeys	= new KEYSCALING [ScalingKeyNum]();
 	for( i=0 ; i<ScalingKeyNum ; i++ ) {
 		pScalingKeys[i] = m_pScalingKeys[i];
 	}
 	SAFE_DELETES( m_pScalingKeys );
 	m_ScalingKeyNum = ScalingKeyNum + pAnimElement->m_ScalingKeyNum;
-	m_pScalingKeys = new KEYSCALING [ m_ScalingKeyNum ];
+	m_pScalingKeys = new KEYSCALING [ m_ScalingKeyNum ]();
 	for( i=0 ; i<ScalingKeyNum ; i++ ) {
 		m_pScalingKeys[i] = pScalingKeys[i];
 	}
@@ -2254,13 +2269,13 @@ bool CMotionElement::AddMotionElement( CMotionElement *pAnimElement )
 	// 移動
 	//-----------------------------------------------------
 	TranslateKeyNum	= m_TranslateKeyNum;
-	pTranslateKeys	= new KEYTRANSLATION [TranslateKeyNum];
+	pTranslateKeys	= new KEYTRANSLATION [TranslateKeyNum]();
 	for( i=0 ; i<TranslateKeyNum ; i++ ) {
 		pTranslateKeys[i] = m_pTranslateKeys[i];
 	}
 	SAFE_DELETES( m_pTranslateKeys );
 	m_TranslateKeyNum = TranslateKeyNum + pAnimElement->m_TranslateKeyNum;
-	m_pTranslateKeys = new KEYTRANSLATION [ m_TranslateKeyNum ];
+	m_pTranslateKeys = new KEYTRANSLATION [ m_TranslateKeyNum ]();
 	for( i=0 ; i<TranslateKeyNum ; i++ ) {
 		m_pTranslateKeys[i] = pTranslateKeys[i];
 	}
@@ -2575,7 +2590,7 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 		hr = 0;
@@ -3216,7 +3231,7 @@ HRESULT CModel::LoadBoneFromFile( char *FileName )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 		hr = 0;
@@ -3287,7 +3302,7 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 		hr = 0;
@@ -3342,7 +3357,7 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 	hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 		hr = 0;
@@ -3421,7 +3436,7 @@ int CModel::LoadInfoFromFile( char *FileName, int Offset )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 	} else {
@@ -3474,7 +3489,7 @@ HRESULT CModel::LoadMotionFromFile( char *FileName )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 		hr = 0;
@@ -5098,7 +5113,7 @@ int CPC::CountBoneFromFile( char *FileName )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 	} else {
@@ -5140,7 +5155,7 @@ int CPC::CountTextureFromFile( char *FileName )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 	} else {
@@ -5236,7 +5251,7 @@ bool CPC::LoadInventory( char *FileName )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile == INVALID_HANDLE_VALUE ) return false;
 	dwSize = GetFileSize(hFile,NULL);
-	if( (pFile = new char[dwSize]) == NULL ) return false;
+	if( (pFile = new char[dwSize]()) == NULL ) return false;
 	ReadFile(hFile,pFile,dwSize,&dmy,NULL);
 	CloseHandle(hFile);
 	int *ptr = (int*)pFile;
@@ -5586,7 +5601,7 @@ int CNPC::CountBoneFromFile( char *FileName )
 	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
-	    pdat = new char[dwSize];
+	    pdat = new char[dwSize]();
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 	} else {
