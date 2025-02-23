@@ -80,16 +80,16 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkIncremental>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files\Autodesk\FBX\FBX SDK\2020.2.1\include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files\Autodesk\FBX\FBX SDK\2020.2.1\lib\vs2019\x86\debug;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Program Files\Autodesk\FBX\FBX SDK\2020.2.1\include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\Autodesk\FBX\FBX SDK\2020.2.1\lib\vs2019\x86\release;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\lib\x64\debug;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Midl>
@@ -121,7 +121,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalOptions>/nodefaultlib:libci %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>d3dx9.lib;d3d9.lib;d3dxof.lib;dxguid.lib;winmm.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libfbxsdk.lib;d3dx9.lib;d3d9.lib;d3dxof.lib;dxguid.lib;winmm.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>Debug/ModelTest.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -173,7 +173,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalOptions>/nodefaultlib:libci %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>d3dx9.lib;d3d9.lib;d3dxof.lib;dxguid.lib;winmm.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3dx9.lib;d3d9.lib;d3dxof.lib;dxguid.lib;winmm.lib;odbc32.lib;odbccp32.lib;libfbxsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>Release/ModelTest.exe</OutputFile>
       <Version>0.1</Version>
       <SuppressStartupBanner>true</SuppressStartupBanner>
@@ -215,7 +215,7 @@
     </ResourceCompile>
     <Link>
       <AdditionalOptions>/nodefaultlib:libci %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalDependencies>d3dx9.lib;d3d9.lib;d3dxof.lib;dxguid.lib;winmm.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libfbxsdk.lib;d3dx9.lib;d3d9.lib;d3dxof.lib;dxguid.lib;winmm.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>Debug/ModelTest.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -304,6 +304,7 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BrowseInformation>
     </ClCompile>
+    <ClCompile Include="SaveFile.cpp" />
     <ClCompile Include="WinMain.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">MaxSpeed</Optimization>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(PreprocessorDefinitions)</PreprocessorDefinitions>

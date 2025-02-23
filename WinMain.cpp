@@ -1209,17 +1209,17 @@ static short	x1=-1,y1=-1,x2,y2;
 	sfn.lpstrTitle = "MQOセーブ";
     sfn.lpstrInitialDir = NULL;
  
-	lstrcpy(szFPathx, "*.x");
+	lstrcpy(szFPathx, "*.fbx");
 	ZeroMemory(&sfx, sizeof(sfx));
 	sfx.lStructSize = sizeof(sfx);
 	sfx.hwndOwner = NULL;
 	sfx.lpstrFile = szFPathx;
 	sfx.nMaxFile = sizeof(szFPathx);
-	sfx.lpstrFilter = "x Format(*.x)\0*.x\0";
+	sfx.lpstrFilter = "FBX Format(*.fbx)\0*.fbx\0";
 	sfx.nFilterIndex = 1;
 	sfx.lpstrFileTitle = szFNamex;
 	sfx.nMaxFileTitle = sizeof(szFNamex);
-	sfx.lpstrTitle = "Xファイル　セーブ";
+	sfx.lpstrTitle = "FBXファイル　セーブ";
 	sfx.lpstrInitialDir = NULL;
 	switch (msg)
 	{
@@ -1323,10 +1323,10 @@ static short	x1=-1,y1=-1,x2,y2;
 					MessageBox(NULL, strmsg, "ＷＡＲＮＮＩＮＧ", MB_OK | MB_ICONINFORMATION);
 				}
 			}
-			else if (LOWORD(wParam) == ID_MNU_SAVEX) {
+			else if (LOWORD(wParam) == ID_MNU_SAVEFBX) {
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfx)) {
-						if (!pPC->saveX(szFPathx, szFNamex)) {
+						if (!pPC->saveFBX(szFPathx, szFNamex)) {
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
@@ -1334,7 +1334,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				}
 				else {
 					if (GetSaveFileName(&sfx)) {
-						if (!pNPC->saveX(szFPathx, szFNamex)) {
+						if (!pNPC->saveFBX(szFPathx, szFNamex)) {
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}

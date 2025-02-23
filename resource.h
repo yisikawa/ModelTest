@@ -41,7 +41,7 @@
 #define ID_40268                        40268
 #define ID_MNU_SAVE                     40269
 #define ID_40270                        40270
-#define ID_MNU_SAVEX                    40271
+#define ID_MNU_SAVEFBX                  40271
 
 // Next default values for new objects
 // 

@@ -4,8 +4,10 @@
 //======================================================================
 // INCLUDE
 //======================================================================
+#include <fbxsdk.h>
 #include <d3d9.h>
 #include <d3dx9.h>
+#include <d3dx9math.h>
 
 
 //======================================================================
@@ -536,13 +538,18 @@ public:
 	virtual bool	outputBone2VerNo(FILE *fd, int boneNo);
 	virtual bool	outputBone2VerWeight(FILE *fd, int boneNo);
 	virtual bool	saveX(char *FPath, char *FName);
+	virtual bool	saveFBX(char* FPath, char* FName);
 	virtual bool	outputConvMatrix(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMatrix(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMatrixSub(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMeshX(char *FPath, char *FName, FILE *fd);
 	virtual bool	outputMultiMeshX(char *FPath, char *Fname, FILE *fd);
 	virtual bool	outputVertex(FILE *fd);
-	virtual bool	outputFace(FILE *fd);
+	virtual bool	outputFace(FILE* fd);
+	virtual bool	outputFBXVertex(FbxMesh *pfbxMesh);
+	virtual bool	outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterialElement);
+	virtual bool	outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh *pMesh);
+	virtual bool	SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo);
 	virtual bool	outputNormal(FILE *fd);
 	virtual bool	outputNormalFace(FILE *fd);
 	virtual bool	outputTexCoord(FILE *fd);
