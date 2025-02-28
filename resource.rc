@@ -29,7 +29,8 @@ IDR_MENU1 MENU
 BEGIN
     POPUP "ファイル(&F)"
     BEGIN
-        MENUITEM "SAVEMQO",                     ID_MNU_SAVE
+        MENUITEM "SAVEMQO",                       ID_MNU_SAVE
+        MENUITEM "SAVEX",                         ID_MNU_SAVEX
         MENUITEM "SAVEFBX",                       ID_MNU_SAVEFBX
         MENUITEM "終了(&X)",                      ID_MNU_EXIT
     END

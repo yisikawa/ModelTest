@@ -1192,9 +1192,10 @@ static float	Delta=0.,Step=0.2f;
 static bool		lDrag = false,rDrag = false;
 static short	x1=-1,y1=-1,x2,y2;
    // ファイルオープンダイアログボックスのテスト
-    OPENFILENAME sfn,sfx;
+    OPENFILENAME sfn,sfx,sfbx;
     char szFPath[256],szFName[256],strmsg[256];
 	char szFPathx[256], szFNamex[256];
+	char szFPathfbx[256], szFNamefbx[256];
 
     lstrcpy(szFPath, "*.mqo");
     ZeroMemory(&sfn, sizeof(sfn));
@@ -1209,18 +1210,31 @@ static short	x1=-1,y1=-1,x2,y2;
 	sfn.lpstrTitle = "MQOセーブ";
     sfn.lpstrInitialDir = NULL;
  
-	lstrcpy(szFPathx, "*.fbx");
+	lstrcpy(szFPathx, "*.x");
 	ZeroMemory(&sfx, sizeof(sfx));
 	sfx.lStructSize = sizeof(sfx);
 	sfx.hwndOwner = NULL;
 	sfx.lpstrFile = szFPathx;
 	sfx.nMaxFile = sizeof(szFPathx);
-	sfx.lpstrFilter = "FBX Format(*.fbx)\0*.fbx\0";
+	sfx.lpstrFilter = "X Format(*.x)\0*.x\0";
 	sfx.nFilterIndex = 1;
 	sfx.lpstrFileTitle = szFNamex;
 	sfx.nMaxFileTitle = sizeof(szFNamex);
-	sfx.lpstrTitle = "FBXファイル　セーブ";
+	sfx.lpstrTitle = "Xファイル　セーブ";
 	sfx.lpstrInitialDir = NULL;
+
+	lstrcpy(szFPathfbx, "*.fbx");
+	ZeroMemory(&sfbx, sizeof(sfbx));
+	sfbx.lStructSize = sizeof(sfbx);
+	sfbx.hwndOwner = NULL;
+	sfbx.lpstrFile = szFPathfbx;
+	sfbx.nMaxFile = sizeof(szFPathfbx);
+	sfbx.lpstrFilter = "FBX Format(*.fbx)\0*.fbx\0";
+	sfbx.nFilterIndex = 1;
+	sfbx.lpstrFileTitle = szFNamefbx;
+	sfbx.nMaxFileTitle = sizeof(szFNamefbx);
+	sfbx.lpstrTitle = "FBXファイル　セーブ";
+	sfbx.lpstrInitialDir = NULL;
 	switch (msg)
 	{
 		//==============================================
@@ -1325,8 +1339,26 @@ static short	x1=-1,y1=-1,x2,y2;
 			}
 			else if (LOWORD(wParam) == ID_MNU_SAVEFBX) {
 				if (g_mPCFlag) {
+					if (GetSaveFileName(&sfbx)) {
+						if (!pPC->saveFBX(szFPathfbx, szFNamefbx)) {
+							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
+							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
+						}
+					}
+				}
+				else {
+					if (GetSaveFileName(&sfbx)) {
+						if (!pNPC->saveFBX(szFPathfbx, szFNamefbx)) {
+							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
+							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
+						}
+					}
+				}
+			}
+			else if (LOWORD(wParam) == ID_MNU_SAVEX) {
+				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfx)) {
-						if (!pPC->saveFBX(szFPathx, szFNamex)) {
+						if (!pPC->saveX(szFPathx, szFNamex)) {
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
@@ -1334,7 +1366,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				}
 				else {
 					if (GetSaveFileName(&sfx)) {
-						if (!pNPC->saveFBX(szFPathx, szFNamex)) {
+						if (!pNPC->saveX(szFPathx, szFNamex)) {
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}

@@ -1973,6 +1973,7 @@ void CMotionFrame::LoadMotionSet( char *pFile )
 //======================================================================
 CMotionElement::CMotionElement()
 {
+	//m_BoneNo			= -1;
 	m_RotationKeyNum	= 0;
 	m_ScalingKeyNum		= 0;
 	m_TranslateKeyNum	= 0;
@@ -1988,6 +1989,7 @@ CMotionElement::CMotionElement()
 //======================================================================
 void CMotionElement::InitData( void )
 {
+	//m_BoneNo			= -1;
 	m_RotationKeyNum	= 0;
 	m_ScalingKeyNum		= 0;
 	m_TranslateKeyNum	= 0;
