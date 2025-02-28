@@ -320,6 +320,9 @@ bool CModel::SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo) {
 
 bool CModel::saveFBX(char* FPath, char* FName)
 {
+	D3DXQUATERNION q(0., 0., 0., 1.);
+	FbxQuaternion qq(0., 0., 0., 1.);
+	FbxAMatrix fMat;
 	D3DXVECTOR3 t, s, r;
 	D3DXVECTOR3 pIn, pOut;
 	char* ptr, fpath[256], texpath[256], texName[256];
@@ -402,90 +405,92 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	//	ボーン出力
 	outputFBXBone(rootNode, fbxScene, cubeMesh);
 	// アニメーションセット出力
-	//string motionName;
-	//FbxAnimLayer* animLayer = FbxAnimLayer::Create(fbxScene, "BaseAnimationLayer");
+	string motionName;
+	/*FbxAnimLayer* animLayer = FbxAnimLayer::Create(fbxScene, "BaseAnimationLayer");*/
 
-	//char* bName[8];
-	//if (g_mPCFlag) {
-	//	motionName = string(pPC->GetMotionName());
-	//	FbxAnimStack* pAnimStack = FbxAnimStack::Create(fbxScene, (motionName+"_Stack").c_str());
-	//	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(fbxScene, (motionName+"_Layer").c_str());
-	//	pAnimStack->AddMember(pAnimLayer);
+	if (g_mPCFlag) {
+		motionName = string(pPC->GetMotionName());
+		FbxAnimStack* pAnimStack = FbxAnimStack::Create(fbxScene, (motionName+"_Stack").c_str());
+		FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(fbxScene, (motionName+"_Layer").c_str());
+		pAnimStack->AddMember(pAnimLayer);
 
-	//	int j;
-	//	FbxNode* pNode;
-	//	for (int i = 0; i < m_nBone; i++) {
+		int j;
+		FbxNode* pNode;
+		for (int i = 0; i < m_nBone; i++) {
+			for ( j = 0; j < fbxScene->GetNodeCount(); j++) {
+				 pNode = fbxScene->GetNode(j);
+				if (string(m_Bones[i].m_Name) == string(pNode->GetName())) break;
+			}
+			if ( j >= fbxScene->GetNodeCount()) continue;
+			int keyNum = m_MotionArray[i].m_RotationKeyNum;
+			if (keyNum <= 0) continue;
+			// 位置アニメーションカーブ
+			FbxAnimCurve* curveTX = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
+			FbxAnimCurve* curveTY = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
+			FbxAnimCurve* curveTZ = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
+			// 回転アニメーションカーブ (Quaternion -> Euler 変換が必要な場合あり)
+			FbxAnimCurve* curveRX = pNode->LclRotation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
+			FbxAnimCurve* curveRY = pNode->LclRotation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
+			FbxAnimCurve* curveRZ = pNode->LclRotation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
+			// スケールアニメーションカーブ
+			FbxAnimCurve* curveSX = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
+			FbxAnimCurve* curveSY = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
+			FbxAnimCurve* curveSZ = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
+			for (int k = 0; k < keyNum; k++) {
+				FbxTime fbxTime;
+				fbxTime.SetSecondDouble(m_MotionArray[i].m_pTranslateKeys[k].Time/3000.); // 時間を秒単位で設定
+				D3DXMATRIX iMatrix;
 
-	//		for ( j = 0; j < fbxScene->GetNodeCount(); j++) {
-	//			 pNode = fbxScene->GetNode(j);
-	//			if (string(m_Bones[i].m_Name) == string(pNode->GetName())) break;
-	//		}
-	//		if ( j >= fbxScene->GetNodeCount()) continue;
-	//		int keyNum = m_MotionArray[i].m_RotationKeyNum;
-	//		if (keyNum <= 0) continue;
-	//		// 位置アニメーションカーブ
-	//		FbxAnimCurve* curveTX = pNode->LclTranslation.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
-	//		FbxAnimCurve* curveTY = pNode->LclTranslation.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
-	//		FbxAnimCurve* curveTZ = pNode->LclTranslation.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
-	//		// 回転アニメーションカーブ (Quaternion -> Euler 変換が必要な場合あり)
-	//		FbxAnimCurve* curveRX = pNode->LclRotation.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
-	//		FbxAnimCurve* curveRY = pNode->LclRotation.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
-	//		FbxAnimCurve* curveRZ = pNode->LclRotation.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
-	//		// スケールアニメーションカーブ
-	//		FbxAnimCurve* curveSX = pNode->LclScaling.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
-	//		FbxAnimCurve* curveSY = pNode->LclScaling.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
-	//		FbxAnimCurve* curveSZ = pNode->LclScaling.GetCurve(animLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
-	//		for (int k = 0; k < keyNum; k++) {
-	//			FbxTime fbxTime;
-	//			fbxTime.SetSecondDouble(m_MotionArray[i].m_pTranslateKeys[k].Time/3000.); // 時間を秒単位で設定
-	//			D3DXMATRIX iMatrix;
-	//			//iMatrix = m_Bones[i].m_mTransform;
-	//			//iMatrix *= *(m_MotionArray[i].GetAnimationMatrix(k, &m_Bones[i].m_mTransform));
-	//			iMatrix = *(m_MotionArray[i].GetAnimationMatrix(k, &m_Bones[i].m_mTransform));
-	//			t = D3DXMat2Trans(iMatrix); s = D3DXMat2Scale(iMatrix); r = D3DXMat2EulerRad(iMatrix);
-	//			// 位置キーフレーム設定
-	//			curveTX->KeyModifyBegin();
-	//			curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, t.x);
-	//			curveTX->KeyModifyEnd();
-	//			curveTY->KeyModifyBegin();
-	//			curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, t.y);
-	//			curveTY->KeyModifyEnd();
-	//			curveTZ->KeyModifyBegin();
-	//			curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, t.z);
-	//			curveTZ->KeyModifyEnd();
-	//			// 回転キーフレーム設定 (Quaternion -> Euler 変換が必要な場合あり)
-	//			curveRX->KeyModifyBegin();
-	//			curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, r.x/180.*PAI);
-	//			curveRX->KeyModifyEnd();
-	//			curveRY->KeyModifyBegin();
-	//			curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, r.y / 180. * PAI);
-	//			curveRY->KeyModifyEnd();
-	//			curveRZ->KeyModifyBegin();
-	//			curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, r.z / 180. * PAI);
-	//			curveRZ->KeyModifyEnd();
-	//			// スケールキーフレーム設定
-	//			curveSX->KeyModifyBegin();
-	//			curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, s.x / 180. * PAI);
-	//			curveSX->KeyModifyEnd();
-	//			curveSY->KeyModifyBegin();
-	//			curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, s.y / 180. * PAI);
-	//			curveSY->KeyModifyEnd();
-	//			curveSZ->KeyModifyBegin();
-	//			curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, s.z / 180. * PAI);
-	//			curveSZ->KeyModifyEnd();
-	//		}
-	//	}
-	//}
-	//else {
-	//	motionName = string(pNPC->GetMotionName());
-	//	FbxAnimStack* pAnimStack = FbxAnimStack::Create(fbxScene, (motionName + "_Stack").c_str());
-	//	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(fbxScene, (motionName + "_Layer").c_str());
-	//	pAnimStack->AddMember(pAnimLayer);
-	//	for (int i = 0; i < m_nBone; i++) {
-	//		int keyNum = m_MotionArray[i].m_RotationKeyNum;
-	//		//outputAnimationFBX(pScene, i);
-	//	}
-	//}
+				iMatrix = m_Bones[i].m_mTransform;
+				iMatrix *= *(m_MotionArray[i].GetAnimationMatrix(k, &m_Bones[i].m_mTransform));
+				//t = D3DXMat2Trans(iMatrix); s = D3DXMat2Scale(iMatrix); r = D3DXMat2EulerRad(iMatrix);
+				//iMatrix = *(m_MotionArray[i].GetAnimationMatrix(k, &m_Bones[i].m_mTransform));
+				t = D3DXMat2Trans(iMatrix); s = D3DXMat2Scale(iMatrix);
+				D3DXQuaternionRotationMatrix(&q, &iMatrix); qq.Set(q.x, q.y, q.z, q.w);
+				fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
+				// 位置キーフレーム設定
+				curveTX->KeyModifyBegin();
+				curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, fMat.GetT()[0]);
+				curveTX->KeyModifyEnd();
+				curveTY->KeyModifyBegin();
+				curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, fMat.GetT()[1]);
+				curveTY->KeyModifyEnd();
+				curveTZ->KeyModifyBegin();
+				curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, fMat.GetT()[2]);
+				curveTZ->KeyModifyEnd();
+				// 回転キーフレーム設定 (Quaternion -> Euler 変換が必要な場合あり)
+				curveRX->KeyModifyBegin();
+				curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, fMat.GetR()[0]);
+				curveRX->KeyModifyEnd();
+				curveRY->KeyModifyBegin();
+				curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, fMat.GetR()[1]);
+				curveRY->KeyModifyEnd();
+				curveRZ->KeyModifyBegin();
+				curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, fMat.GetR()[2]);
+				curveRZ->KeyModifyEnd();
+				// スケールキーフレーム設定
+				curveSX->KeyModifyBegin();
+				curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, fMat.GetS()[0]);
+				curveSX->KeyModifyEnd();
+				curveSY->KeyModifyBegin();
+				curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, fMat.GetS()[1]);
+				curveSY->KeyModifyEnd();
+				curveSZ->KeyModifyBegin();
+				curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, fMat.GetS()[2]);
+				curveSZ->KeyModifyEnd();
+			}
+		}
+	}
+	else {
+		motionName = string(pNPC->GetMotionName());
+		FbxAnimStack* pAnimStack = FbxAnimStack::Create(fbxScene, (motionName + "_Stack").c_str());
+		FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(fbxScene, (motionName + "_Layer").c_str());
+		pAnimStack->AddMember(pAnimLayer);
+		for (int i = 0; i < m_nBone; i++) {
+			int keyNum = m_MotionArray[i].m_RotationKeyNum;
+			//outputAnimationFBX(pScene, i);
+		}
+	}
 	// --- FBXファイルのエクスポート ---
 	int fileFormat,lFormatIndex, lFormatCount = fbxManager->GetIOPluginRegistry()->GetWriterFormatCount();
 	for (lFormatIndex = 0; lFormatIndex < lFormatCount; lFormatIndex++)
@@ -570,7 +575,7 @@ bool CModel::saveX(char* FPath, char* FName)
 	fprintf(fd, "}\n");
 	std::vector<std::string> strlist;
 	strlist.clear();
-	//outputAnimationSet(fd, m_MotionName);
+	outputAnimationSet(fd, m_MotionName);
 	//char nameback[8]; strcpy(nameback, m_MotionName);
 	//if (g_mPCFlag) {
 		//CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
