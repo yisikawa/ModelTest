@@ -550,6 +550,7 @@ public:
 	virtual bool	outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterialElement);
 	virtual bool	outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh *pMesh);
 	virtual bool	SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo);
+	virtual bool    outputFBXAnimation(FbxScene* pShene);
 	virtual bool	outputNormal(FILE *fd);
 	virtual bool	outputNormalFace(FILE *fd);
 	virtual bool	outputTexCoord(FILE *fd);
