@@ -193,17 +193,17 @@ D3DXVECTOR3 D3DXMat2Euler(const D3DXMATRIX& mat)
 	// Roll (X軸の回転)
 	double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
 	double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-	euler.x = std::atan2(sinr_cosp, cosr_cosp)*(float)180. / (float)PAI;
+	euler.x = (float)(std::atan2(sinr_cosp, cosr_cosp)*180. / PAI);
 	// Pitch (Y軸の回転)
 	double sinp = 2 * (q.w * q.y - q.z * q.x);
 	if (std::abs(sinp) >= 1)
-		euler.y = std::copysign(PAI/2., sinp) * (float)180. / (float)PAI;	// 90度のクランプ
+		euler.y = (float)(std::copysign(PAI/2., sinp) * 180. / PAI);	// 90度のクランプ
 	else
-		euler.y = std::asin(sinp) * (float)180. / (float)PAI;
+		euler.y = (float)(std::asin(sinp) * 180. / PAI);
 	// Yaw (Z軸の回転)
 	double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
 	double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-	euler.z = std::atan2(siny_cosp, cosy_cosp) * (float)180. / (float)PAI;
+	euler.z = (float)(std::atan2(siny_cosp, cosy_cosp) * 180. / PAI);
 	return euler;
 }
 
@@ -217,21 +217,21 @@ D3DXVECTOR3 D3DXMat2EulerRad(const D3DXMATRIX& mat)
 	// Roll (X軸の回転)
 	double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
 	double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-	euler.x = std::atan2(sinr_cosp, cosr_cosp);
+	euler.x = (float)std::atan2(sinr_cosp, cosr_cosp);
 	// Pitch (Y軸の回転)
 	double sinp = 2 * (q.w * q.y - q.z * q.x);
 	if (std::abs(sinp) >= 1)
-		euler.y = std::copysign(PAI / 2., sinp);	// 90度のクランプ
+		euler.y = (float)std::copysign(PAI / 2., sinp);	// 90度のクランプ
 	else
-		euler.y = std::asin(sinp) * (float)180. / (float)PAI;
+		euler.y = (float)(std::asin(sinp) * 180. / PAI);
 	// Yaw (Z軸の回転)
 	double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
 	double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-	euler.z = std::atan2(siny_cosp, cosy_cosp);
+	euler.z = (float)std::atan2(siny_cosp, cosy_cosp);
 	return euler;
 }
 
-bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh, FbxPose* bindPose)
+bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 {
 	D3DXQUATERNION q(0., 0., 0., 1.);
 	FbxQuaternion qq(0., 0., 0., 1.);
@@ -260,7 +260,6 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh, F
 	pRBoneNode->LclScaling.Set(FbxVector4(s.x, s.y, s.z));
 	pRBoneNode->LclRotation.Set(FbxVector4(r.x, r.y, r.z));
 	pRootNode->AddChild(pRBoneNode);
-	bindPose->Add(pRBoneNode, (pRootNode->GetChild(0))->EvaluateGlobalTransform());
 	for (int i = 0; i < m_nBone; i++) {
 		sprintf(m_Bones[i].m_Name,"Bone%03d", i);
 		FbxNode* pCBoneNode = FbxNode::Create(pScene,m_Bones[i].m_Name); BoneArrys.push_back(pCBoneNode);
@@ -274,7 +273,6 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh, F
 		if (m_Bones[i].m_mParent >= 0) {
 			(i == 0) ? pRBoneNode->AddChild(pCBoneNode) : BoneArrys[m_Bones[i].m_mParent]->AddChild(pCBoneNode);
 		}
-		bindPose->Add(pCBoneNode, (pRootNode->GetChild(0))->EvaluateGlobalTransform());
 		// 子ボーンのクラスタ
 		if (countBone2Ver(i) <= 0) continue;
 		FbxCluster* pCBoneCluster = FbxCluster::Create(pScene, (string(m_Bones[i].m_Name) + "_Clus").c_str());
@@ -284,7 +282,7 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh, F
 		t = D3DXMat2Trans(m_Bones[i].m_mInvTrans); s = D3DXMat2Scale(m_Bones[i].m_mInvTrans);
 		D3DXQuaternionRotationMatrix(&q, &m_Bones[i].m_mInvTrans);qq.Set(q.x, q.y, q.z, q.w);
 		fMat.SetTQS(FbxVector4(t.x,t.y,t.z),qq,FbxVector4(s.x,s.y,s.z));
-		pCBoneCluster->SetTransformMatrix(pCBoneNode->EvaluateGlobalTransform() *fMat);
+		pCBoneCluster->SetTransformMatrix(pCBoneNode->EvaluateGlobalTransform() * fMat);
 		pCBoneCluster->SetTransformLinkMatrix(pCBoneNode->EvaluateGlobalTransform());
 		pSkin->AddCluster(pCBoneCluster);
 	}
@@ -353,9 +351,6 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	FbxMesh* cubeMesh = FbxMesh::Create(fbxScene, (string(FName) + "_Mesh").c_str());	// --- メッシュの作成 ---
 	meshNode->SetNodeAttribute(cubeMesh);
 	rootNode->AddChild(meshNode);
-	FbxPose* bindPose = FbxPose::Create(fbxScene, "BindPose");
-	bindPose->SetIsBindPose(true);
-	bindPose->Add(meshNode,meshNode->EvaluateGlobalTransform());
 	strcpy(fpath, FPath);
 	if ((ptr = strrstr(fpath, FName))) *ptr = '\0';
 	// マテリアル作成
@@ -405,7 +400,7 @@ bool CModel::saveFBX(char* FPath, char* FName)
 
 	pLayer->SetMaterials(pMaterialElement);
 	//	ボーン出力
-	outputFBXBone(rootNode, fbxScene, cubeMesh,bindPose);
+	outputFBXBone(rootNode, fbxScene, cubeMesh);
 	// アニメーションセット出力
 	//string motionName;
 	//FbxAnimLayer* animLayer = FbxAnimLayer::Create(fbxScene, "BaseAnimationLayer");
