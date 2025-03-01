@@ -237,13 +237,6 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 	FbxQuaternion qq(0., 0., 0., 1.);
 	FbxAMatrix fMat;
 	D3DXVECTOR3 t, s, r;
-	D3DXMATRIX lmat,mat,rootMat;
-
-	D3DXMatrixIdentity(&lmat);
-	D3DXMatrixIdentity(&rootMat);
-	//D3DXMatrixRotationYawPitchRoll(&rootMat, -PAI / 2., PAI,0.);
-	//D3DXMatrixRotationYawPitchRoll(&lmat,0. , PAI, 0.);
-
 
 	std::vector<FbxNode*> BoneArrys;
 	// 3. スキニングの設定
@@ -255,10 +248,7 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 	pRBoneAttr->SetSkeletonType(FbxSkeleton::eLimbNode); // ルートボーンタイプを設定
 	//pRBoneAttr->SetSkeletonType(FbxSkeleton::eRoot); // ルートボーンタイプを設定
 	pRBoneNode->SetNodeAttribute(pRBoneAttr);
-	t = D3DXMat2Trans(lmat); s = D3DXMat2Scale(lmat); r = D3DXMat2Euler(lmat);
-	pRBoneNode->LclTranslation.Set(FbxVector4(t.x,t.y,t.z));
-	pRBoneNode->LclScaling.Set(FbxVector4(s.x, s.y, s.z));
-	pRBoneNode->LclRotation.Set(FbxVector4(r.x, r.y, r.z));
+	pRBoneNode->LclRotation.Set(FbxVector4(-180., -90., r.z));
 	pRootNode->AddChild(pRBoneNode);
 	for (int i = 0; i < m_nBone; i++) {
 		sprintf(m_Bones[i].m_Name,"Bone%03d", i);
@@ -493,19 +483,19 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	outputFBXAnimation(fbxScene);
 	// --- FBXファイルのエクスポート ---
 	int fileFormat,lFormatIndex, lFormatCount = fbxManager->GetIOPluginRegistry()->GetWriterFormatCount();
-	for (lFormatIndex = 0; lFormatIndex < lFormatCount; lFormatIndex++)
-	{
-		if (fbxManager->GetIOPluginRegistry()->WriterIsFBX(lFormatIndex))
-		{
-			FbxString lDesc = fbxManager->GetIOPluginRegistry()->GetWriterFormatDescription(lFormatIndex);
-			const char* lASCII = "ascii";
-			if (lDesc.Find(lASCII) >= 0)
-			{
-				fileFormat = lFormatIndex;
-				break;
-			}
-		}
-	}
+	//for (lFormatIndex = 0; lFormatIndex < lFormatCount; lFormatIndex++)
+	//{
+	//	if (fbxManager->GetIOPluginRegistry()->WriterIsFBX(lFormatIndex))
+	//	{
+	//		FbxString lDesc = fbxManager->GetIOPluginRegistry()->GetWriterFormatDescription(lFormatIndex);
+	//		const char* lASCII = "ascii";
+	//		if (lDesc.Find(lASCII) >= 0)
+	//		{
+	//			fileFormat = lFormatIndex;
+	//			break;
+	//		}
+	//	}
+	//}
 	FbxExporter* fbxExporter = FbxExporter::Create(fbxManager, "output");
 	if (!fbxExporter->Initialize((string(FPath) + ".fbx").c_str(), fileFormat, fbxManager->GetIOSettings())) {
 		FBXSDK_printf("Error: FbxExporter initialization failed for file '%s'.\n", (string(FPath) + ".fbx").c_str());
@@ -544,7 +534,6 @@ bool CModel::saveX(char* FPath, char* FName)
 	D3DXMatrixRotationZ(&rootMatrix, (float)PAI);
 	rootMatrix *= mat;
 	D3DXMatrixIdentity(&lmatrix);
-	D3DXMatrixIdentity(&rootMatrix);
 
 	if ((ptr = strstr(FPath, ".x"))) *ptr = '\0';
 	if ((ptr = strstr(FName, ".x"))) *ptr = '\0';
