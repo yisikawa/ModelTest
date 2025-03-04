@@ -30,6 +30,13 @@ char* strrstr(const char* string, const char* pattern);// 検索対象文字列を指定す
 //======================================================================
 bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 {
+	D3DXMATRIX rootMatrix, mat;
+	D3DXVECTOR3 vert;
+
+	D3DXMatrixRotationY(&mat, (float)(PAI / 2.));
+	D3DXMatrixRotationX(&rootMatrix, (float)PAI);
+	rootMatrix *= mat;
+
 	FbxGeometryElementNormal* normalElement = pfbxMesh->CreateElementNormal();
 	normalElement->SetMappingMode(FbxGeometryElement::eByControlPoint); // 頂点ごとに法線を設定
 	normalElement->SetReferenceMode(FbxGeometryElement::eDirect); // 法線を直接指定
@@ -50,8 +57,14 @@ bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 				pV1->p.x = pV1->p.y = pV1->p.z = pV1->n.x = pV1->n.y = pV1->n.z = 0.;
 				pV1->u = pV1->v = pV1->b1 = 0.; pV1->indx = 0;
 			}
-			pfbxMesh->SetControlPointAt(FbxVector4(pV1->p.x, pV1->p.y, pV1->p.z), no); no++;
-			normalElement->GetDirectArray().Add(FbxVector4(pV1->n.x, pV1->n.y, pV1->n.z));
+			vert.x = pV1->p.x; vert.y = pV1->p.y; vert.z = pV1->p.z;
+			D3DXVec3TransformCoord(&vert, &vert, &rootMatrix);
+			pfbxMesh->SetControlPointAt(FbxVector4(vert.x, vert.y, vert.z), no); no++;
+			//pfbxMesh->SetControlPointAt(FbxVector4(pV1->p.x, pV1->p.y, pV1->p.z), no); no++;
+			vert.x = pV1->n.x; vert.y = pV1->n.y; vert.z = pV1->n.z;
+			D3DXVec3TransformNormal(&vert, &vert, &rootMatrix);
+			//normalElement->GetDirectArray().Add(FbxVector4(pV1->n.x, pV1->n.y, pV1->n.z));
+			normalElement->GetDirectArray().Add(FbxVector4(vert.x, vert.y, vert.z));
 			(pV1->u < 0.0) ? pV1->u = 0.: pV1->u = pV1->u;
 			(pV1->u > 1.0) ? pV1->u = 1.: pV1->u = pV1->u;
 			(pV1->v < 0.0) ? pV1->v = 0.: pV1->v = pV1->v;
@@ -185,25 +198,32 @@ D3DXVECTOR3 D3DXMat2Scale(const D3DXMATRIX& d3dxMatrix)
 
 D3DXVECTOR3 D3DXMat2Euler(const D3DXMATRIX& mat)
 {
+	FbxAMatrix  rotMat;
+	FbxQuaternion qq(0., 0., 0., 1.);
 	D3DXVECTOR3 euler(0., 0., 0.);
 	D3DXQUATERNION q(0., 0., 0., 1.);
 
 	D3DXQuaternionRotationMatrix(&q, &mat);
-
-	// Roll (X軸の回転)
-	double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
-	double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-	euler.x = (float)(std::atan2(sinr_cosp, cosr_cosp)*180. / PAI);
-	// Pitch (Y軸の回転)
-	double sinp = 2 * (q.w * q.y - q.z * q.x);
-	if (std::abs(sinp) >= 1)
-		euler.y = (float)(std::copysign(PAI/2., sinp) * 180. / PAI);	// 90度のクランプ
-	else
-		euler.y = (float)(std::asin(sinp) * 180. / PAI);
-	// Yaw (Z軸の回転)
-	double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-	double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-	euler.z = (float)(std::atan2(siny_cosp, cosy_cosp) * 180. / PAI);
+	qq.Set(q.x, q.y, q.z, q.w);
+	rotMat.SetQ(qq);
+	FbxVector4 fbxEuler = rotMat.GetR();
+	euler.x = fbxEuler[0];
+	euler.y = fbxEuler[1];
+	euler.z = fbxEuler[2];
+	//// Roll (X軸の回転)
+	//double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
+	//double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
+	//euler.x = (float)(std::atan2(sinr_cosp, cosr_cosp)*180. / PAI);
+	//// Pitch (Y軸の回転)
+	//double sinp = 2 * (q.w * q.y - q.z * q.x);
+	//if (std::abs(sinp) >= 1)
+	//	euler.y = (float)(std::copysign(PAI/2., sinp) * 180. / PAI);	// 90度のクランプ
+	//else
+	//	euler.y = (float)(std::asin(sinp) * 180. / PAI);
+	//// Yaw (Z軸の回転)
+	//double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
+	//double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
+	//euler.z = (float)(std::atan2(siny_cosp, cosy_cosp) * 180. / PAI);
 	return euler;
 }
 
@@ -233,23 +253,33 @@ D3DXVECTOR3 D3DXMat2EulerRad(const D3DXMATRIX& mat)
 
 bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 {
+
 	D3DXQUATERNION q(0., 0., 0., 1.);
 	FbxQuaternion qq(0., 0., 0., 1.);
-	FbxAMatrix fMat;
+	FbxAMatrix fMat,rMat;
+	FbxMatrix aMat;	aMat.SetIdentity();
 	D3DXVECTOR3 t, s, r;
+	//FbxNode* pMeshNode = pRootNode->GetChild(0);
+	// バインドポーズ
+	FbxPose* bindPose = FbxPose::Create(pScene, "BindPose");
+	bindPose->SetIsBindPose(true);
 
 	std::vector<FbxNode*> BoneArrys;
-	// 3. スキニングの設定
+	// スキニングの設定
 	FbxSkin* pSkin = FbxSkin::Create(pScene, "SkinDeformer");
 	pMesh->AddDeformer(pSkin);
 	// ルートボーンの作成
 	FbxNode* pRBoneNode = FbxNode::Create(pScene, "Scene_Root"); 
-	FbxSkeleton* pRBoneAttr = FbxSkeleton::Create(pScene, "RootBoneAttr");
+	FbxSkeleton* pRBoneAttr = FbxSkeleton::Create(pScene, "RootBoneSkel");
 	pRBoneAttr->SetSkeletonType(FbxSkeleton::eLimbNode); // ルートボーンタイプを設定
 	//pRBoneAttr->SetSkeletonType(FbxSkeleton::eRoot); // ルートボーンタイプを設定
 	pRBoneNode->SetNodeAttribute(pRBoneAttr);
-	pRBoneNode->LclRotation.Set(FbxVector4(-180., -90., r.z));
+	pRBoneNode->LclRotation.Set(FbxDouble3(-180., -90., 0.) );
+	//pRBoneNode->LclScaling.Set(FbxDouble3(100., 100., 100.));
 	pRootNode->AddChild(pRBoneNode);
+	bindPose->Add(pRBoneNode, aMat);
+	//bindPose->Add(pRBoneNode, pRBoneNode->EvaluateGlobalTransform());
+	rMat = pRBoneNode->EvaluateLocalTransform();
 	for (int i = 0; i < m_nBone; i++) {
 		sprintf(m_Bones[i].m_Name,"Bone%03d", i);
 		FbxNode* pCBoneNode = FbxNode::Create(pScene,m_Bones[i].m_Name); BoneArrys.push_back(pCBoneNode);
@@ -263,20 +293,21 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 		if (m_Bones[i].m_mParent >= 0) {
 			(i == 0) ? pRBoneNode->AddChild(pCBoneNode) : BoneArrys[m_Bones[i].m_mParent]->AddChild(pCBoneNode);
 		}
+		bindPose->Add(pCBoneNode, pCBoneNode->EvaluateGlobalTransform());
 		// 子ボーンのクラスタ
 		if (countBone2Ver(i) <= 0) continue;
-		FbxCluster* pCBoneCluster = FbxCluster::Create(pScene, (string(m_Bones[i].m_Name) + "_Clus").c_str());
+		t = D3DXMat2Trans(m_Bones[i].m_mInvTrans); s = D3DXMat2Scale(m_Bones[i].m_mInvTrans);
+		D3DXQuaternionRotationMatrix(&q, &m_Bones[i].m_mInvTrans); qq.Set(q.x, q.y, q.z, q.w);
+		fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
+		FbxCluster* pCBoneCluster = FbxCluster::Create(pScene, (string(m_Bones[i].m_Name) + "_Skin").c_str());
 		pCBoneCluster->SetLink(pCBoneNode);
 		pCBoneCluster->SetLinkMode(FbxCluster::eTotalOne);
 		SetFBXBone2VerNo(pCBoneCluster,i);
-		t = D3DXMat2Trans(m_Bones[i].m_mInvTrans); s = D3DXMat2Scale(m_Bones[i].m_mInvTrans);
-		D3DXQuaternionRotationMatrix(&q, &m_Bones[i].m_mInvTrans);qq.Set(q.x, q.y, q.z, q.w);
-		fMat.SetTQS(FbxVector4(t.x,t.y,t.z),qq,FbxVector4(s.x,s.y,s.z));
-		pCBoneCluster->SetTransformMatrix(pCBoneNode->EvaluateGlobalTransform() * fMat);
+		pCBoneCluster->SetTransformMatrix(rMat.Inverse() * pCBoneNode->EvaluateGlobalTransform() * fMat);
 		pCBoneCluster->SetTransformLinkMatrix(pCBoneNode->EvaluateGlobalTransform());
 		pSkin->AddCluster(pCBoneCluster);
 	}
-
+	pScene->AddPose(bindPose);
 	return true;
 }
 
@@ -325,8 +356,8 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 	else {
 		motionName = string(pNPC->GetMotionName());
 	}
-	FbxAnimStack* pAnimStack = FbxAnimStack::Create(pScene, (motionName + "_Stack").c_str());
-	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(pScene, (motionName + "_Layer").c_str());
+	FbxAnimStack* pAnimStack = FbxAnimStack::Create(pScene, (motionName + "_S").c_str());
+	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(pScene, (motionName + "_L").c_str());
 	pAnimStack->AddMember(pAnimLayer);
 
 	int j;
@@ -363,34 +394,44 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 			fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
 			// 位置キーフレーム設定
 			curveTX->KeyModifyBegin();
-			curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, fMat.GetT()[0]);
+			curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, (float)fMat.GetT()[0]);
 			curveTX->KeyModifyEnd();
 			curveTY->KeyModifyBegin();
-			curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, fMat.GetT()[1]);
+			curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, (float)fMat.GetT()[1]);
 			curveTY->KeyModifyEnd();
 			curveTZ->KeyModifyBegin();
-			curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, fMat.GetT()[2]);
+			curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, (float)fMat.GetT()[2]);
 			curveTZ->KeyModifyEnd();
 			// 回転キーフレーム設定 (Quaternion -> Euler 変換が必要な場合あり)
 			curveRX->KeyModifyBegin();
-			curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, fMat.GetR()[0]);
+			curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, (float)fMat.GetR()[0]);
 			curveRX->KeyModifyEnd();
 			curveRY->KeyModifyBegin();
-			curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, fMat.GetR()[1]);
+			curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, (float)fMat.GetR()[1]);
 			curveRY->KeyModifyEnd();
 			curveRZ->KeyModifyBegin();
-			curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, fMat.GetR()[2]);
+			curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, (float)fMat.GetR()[2]);
 			curveRZ->KeyModifyEnd();
 			// スケールキーフレーム設定
 			curveSX->KeyModifyBegin();
-			curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, fMat.GetS()[0]);
+			curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, (float)fMat.GetS()[0]);
 			curveSX->KeyModifyEnd();
 			curveSY->KeyModifyBegin();
-			curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, fMat.GetS()[1]);
+			curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, (float)fMat.GetS()[1]);
 			curveSY->KeyModifyEnd();
 			curveSZ->KeyModifyBegin();
-			curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, fMat.GetS()[2]);
+			curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, (float)fMat.GetS()[2]);
 			curveSZ->KeyModifyEnd();
+			// 補間法設定
+			curveTX->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveTY->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveTZ->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveRX->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveRY->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveRZ->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveSX->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveSY->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
+			curveSZ->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
 		}
 	}
 	return true;
@@ -398,7 +439,6 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 
 bool CModel::saveFBX(char* FPath, char* FName)
 {
-
 	D3DXVECTOR3 pIn, pOut;
 	char* ptr, fpath[256], texpath[256], texName[256];
 
@@ -417,20 +457,36 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	fbxManager->SetIOSettings(ios);
 
 	// FBXシーンの作成
-	FbxScene* fbxScene = FbxScene::Create(fbxManager, FName);
+	FbxScene* fbxScene = FbxScene::Create(fbxManager, "");
 	if (!fbxScene) {
 		FBXSDK_printf("Error: FbxScene creation failed.\n");
 		fbxManager->Destroy();
 		return false;
 	}
+	// GlobalSettingsを取得
+	FbxGlobalSettings& globalSettings = fbxScene->GetGlobalSettings();
+	FbxSystemUnit systemUnit(100.);
+	globalSettings.SetSystemUnit(systemUnit);
+	FbxTime::EMode newTimeMode = FbxTime::eFrames30;
+	globalSettings.SetTimeMode(newTimeMode);
+
+	//SceneInfoを取得
+	FbxDocumentInfo* sceneInfo = fbxScene->GetSceneInfo();
+	sceneInfo->mTitle.Append("ewhM:Scene",strlen("ewhM:Scene"));
+	sceneInfo->mKeywords.Append("ewhModelViewer", strlen("ewhModelViewer"));
+	sceneInfo->mAuthor.Append("ewhM dev",strlen("ewhM dev"));
+	sceneInfo->mRevision.Append("rev.1.0", strlen("rev.1.0"));
+	sceneInfo->mComment.Append("Thanks", strlen("Thanks"));
+
 	// メッシュノードの作成
 	FbxNode* rootNode = fbxScene->GetRootNode();// ルートノードの取得
-	FbxNode* meshNode = FbxNode::Create(fbxScene, ("Body_"+string(FName)).c_str());
-	FbxMesh* cubeMesh = FbxMesh::Create(fbxScene, (string(FName) + "_Mesh").c_str());	// --- メッシュの作成 ---
+	FbxNode* meshNode = FbxNode::Create(fbxScene, "ewhNode");
+	FbxMesh* cubeMesh = FbxMesh::Create(fbxScene, "ewhMesh");	// --- メッシュの作成 ---
 	meshNode->SetNodeAttribute(cubeMesh);
 	rootNode->AddChild(meshNode);
 	strcpy(fpath, FPath);
 	if ((ptr = strrstr(fpath, FName))) *ptr = '\0';
+	// マテリアル属性　設定
 	// マテリアル作成
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
@@ -439,7 +495,9 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());
-		//material->Diffuse.Set(FbxDouble3(1., 1., 1.));
+		material->Ambient.Set(FbxDouble3(0., 0., 0.));
+		material->Diffuse.Set(FbxDouble3(1., 1., 1.));
+		material->Specular.Set(FbxDouble3(0., 0., 0.));
 		material->ShadingModel.Set("Phong");
 		FbxFileTexture* texture = FbxFileTexture::Create(fbxScene, ("Tex_" + string(texName)).c_str());
 		texture->SetFileName((string(texName)+".bmp").c_str()); // テクスチャファイルパス設定
@@ -482,20 +540,23 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	//　アニメーション出力
 	outputFBXAnimation(fbxScene);
 	// --- FBXファイルのエクスポート ---
-	int fileFormat,lFormatIndex, lFormatCount = fbxManager->GetIOPluginRegistry()->GetWriterFormatCount();
-	//for (lFormatIndex = 0; lFormatIndex < lFormatCount; lFormatIndex++)
-	//{
-	//	if (fbxManager->GetIOPluginRegistry()->WriterIsFBX(lFormatIndex))
-	//	{
-	//		FbxString lDesc = fbxManager->GetIOPluginRegistry()->GetWriterFormatDescription(lFormatIndex);
-	//		const char* lASCII = "ascii";
-	//		if (lDesc.Find(lASCII) >= 0)
-	//		{
-	//			fileFormat = lFormatIndex;
-	//			break;
-	//		}
-	//	}
-	//}
+	int fileFormat=0,lFormatIndex=0, lFormatCount=0;
+	lFormatCount = fbxManager->GetIOPluginRegistry()->GetWriterFormatCount();
+	if (MessageBox(NULL, "FBX asciiで出力しますか?\nasciiはblenderにインポートできません", "FBX ascii or FBXbinary出力", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+		for (lFormatIndex = 0; lFormatIndex < lFormatCount; lFormatIndex++)
+		{
+			if (fbxManager->GetIOPluginRegistry()->WriterIsFBX(lFormatIndex))
+			{
+				FbxString lDesc = fbxManager->GetIOPluginRegistry()->GetWriterFormatDescription(lFormatIndex);
+				const char* lASCII = "ascii";
+				if (lDesc.Find(lASCII) >= 0)
+				{
+					fileFormat = lFormatIndex;
+					break;
+				}
+			}
+		}
+	}
 	FbxExporter* fbxExporter = FbxExporter::Create(fbxManager, "output");
 	if (!fbxExporter->Initialize((string(FPath) + ".fbx").c_str(), fileFormat, fbxManager->GetIOSettings())) {
 		FBXSDK_printf("Error: FbxExporter initialization failed for file '%s'.\n", (string(FPath) + ".fbx").c_str());
@@ -527,13 +588,14 @@ bool CModel::saveX(char* FPath, char* FName)
 {
 	FILE* fd;
 	char* ptr, strmsg[256], path[256];
-	D3DXMATRIX lmatrix, rootMatrix;
+	D3DXMATRIX lmatrix;
+	D3DXMATRIX rootMatrix,mat;
 
-	D3DXMATRIX mat;
 	D3DXMatrixRotationY(&mat, (float)(PAI / 2.));
 	D3DXMatrixRotationZ(&rootMatrix, (float)PAI);
 	rootMatrix *= mat;
 	D3DXMatrixIdentity(&lmatrix);
+	//D3DXMatrixIdentity(&rootMatrix);
 
 	if ((ptr = strstr(FPath, ".x"))) *ptr = '\0';
 	if ((ptr = strstr(FName, ".x"))) *ptr = '\0';

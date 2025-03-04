@@ -442,7 +442,8 @@ CStream::CStream()
 	m_FaceCount		= 0;
 	m_DispLevel		= 0;
 	m_texNo			= 0;
-	m_Level = 0;
+	m_NumElement	= 0;
+	m_Level			= 0;
 }
 
 //======================================================================
@@ -502,6 +503,7 @@ CMaterial::CMaterial()
 	m_IndexStart	= 0;
 	m_FaceCount		= 0;
 	memset( &m_Material, 0x00, sizeof(m_Material) );
+	memset(&m_Name, 0x00, sizeof(m_Name));
 	m_Material.Diffuse.a = 1.0f;
 	m_Material.Diffuse.r = 1.0f;
 	m_Material.Diffuse.g = 1.0f;
@@ -588,6 +590,7 @@ IDirect3DTexture9 *CMaterial::GetTexture( void )
 CMesh::CMesh()
 {
 //	m_pParent				= NULL;
+	memset(&m_Name, 0x00, sizeof(m_Name));
 	m_pBoneTransforms		= NULL;
 	m_pBoneTbl				= NULL;
 	m_pBoneTblNum			= NULL;
@@ -1724,6 +1727,7 @@ bool CMesh::prtBone2VerWeight(FILE *fd, int boneNo) {
 //======================================================================
 CBone::CBone()
 {
+	//m_mParent = -1;
 	m_mTerm	  = false;
 	m_pParent = NULL;
 	m_pMotion = NULL;
@@ -2660,7 +2664,7 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 		pos+=next;
 	}
 	// 終了
-	delete pdat;
+	delete[] pdat;
 	return hr;
 }
 
@@ -3261,7 +3265,7 @@ HRESULT CModel::LoadBoneFromFile( char *FileName )
 		pos+=next;
 	}
 	// 終了
-	delete pdat;
+	delete[] pdat;
 	return hr;
 }
 
@@ -3351,7 +3355,7 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 		}
 		pos+=next;
 	}
-	delete pdat;
+	delete[] pdat;
 //	return hr;
 	pos = 0;
 	hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
@@ -3409,7 +3413,7 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 		pos+=next;
 	} 
 	// 終了
-	delete pdat;
+	delete[] pdat;
 	return hr;
 }
 //======================================================================
@@ -3459,7 +3463,7 @@ int CModel::LoadInfoFromFile( char *FileName, int Offset )
 		}
 		pos+=next;
 	}
-	delete pdat;
+	delete[] pdat;
 	return 0;
 }
 
@@ -3527,7 +3531,7 @@ HRESULT CModel::LoadMotionFromFile( char *FileName )
 		pos+=next;
 	}
 	// 終了
-	delete pdat;
+	delete[] pdat;
 	return hr;
 }
 
@@ -3898,6 +3902,7 @@ bool CModel::ConvertMesh(void) {
 //======================================================================
 CPC::CPC()
 {
+	m_mType				= 0;
 	m_mRace				= 0;
 	m_mFace				= 0;
 	m_mHead				= 0;
@@ -3905,11 +3910,17 @@ CPC::CPC()
 	m_mHand				= 0;
 	m_mLegs				= 0;
 	m_mFoot				= 0;
+	m_mInfoBody			= 0;
 	m_mRightWeapon		= 0;
 	m_mLeftWeapon		= 0;
 	m_mRemoteWeapon		= 0;
 	m_MotionLevel		= 0;
 	m_MotionOffset		= 0;
+	m_mInfoRWeapon		= 0;
+	m_mInfoRWeapon2		= 0;
+	m_mInfoLWeapon		= 0;
+	m_mInfoLWeapon2		= 0;
+
 }
 
 //======================================================================
@@ -3958,7 +3969,7 @@ int CPC::CountBoneFromFile( char *FileName )
 		}
 		pos+=next;
 	}
-	delete pdat;
+	delete[] pdat;
 	return count;
 }
 
@@ -4000,7 +4011,7 @@ int CPC::CountTextureFromFile( char *FileName )
 		}
 		pos+=next;
 	}
-	delete pdat;
+	delete[] pdat;
 	return count;
 }
 
@@ -4446,7 +4457,7 @@ int CNPC::CountBoneFromFile( char *FileName )
 		}
 		pos+=next;
 	}
-	delete pdat;
+	delete[] pdat;
 	return count;
 }
 

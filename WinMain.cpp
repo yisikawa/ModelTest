@@ -1341,7 +1341,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfbx)) {
 						if (!pPC->saveFBX(szFPathfbx, szFNamefbx)) {
-							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
+							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathfbx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
 					}
@@ -1349,7 +1349,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				else {
 					if (GetSaveFileName(&sfbx)) {
 						if (!pNPC->saveFBX(szFPathfbx, szFNamefbx)) {
-							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
+							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathfbx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
 					}
@@ -1359,7 +1359,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfx)) {
 						if (!pPC->saveX(szFPathx, szFNamex)) {
-							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
+							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
 					}
@@ -1367,7 +1367,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				else {
 					if (GetSaveFileName(&sfx)) {
 						if (!pNPC->saveX(szFPathx, szFNamex)) {
-							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPath);
+							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
 					}
