@@ -412,10 +412,9 @@ protected:
 
 public:
 	bool					m_mTerm;
-	D3DXMATRIX				m_mWorld,m_mWorldX;
+	D3DXMATRIX				m_mWorld;
 	D3DXMATRIX				m_mTransform;
 	D3DXMATRIX				m_mInvTrans;
-	D3DXMATRIX				m_mInvTransX;
 	D3DXQUATERNION			vecQ;
 	D3DXVECTOR3				vecT, vecR, vecS;
 	CBone();

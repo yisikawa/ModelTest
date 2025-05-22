@@ -207,9 +207,9 @@ D3DXVECTOR3 D3DXMat2Euler(const D3DXMATRIX& mat)
 	qq.Set(q.x, q.y, q.z, q.w);
 	rotMat.SetQ(qq);
 	FbxVector4 fbxEuler = rotMat.GetR();
-	euler.x = fbxEuler[0];
-	euler.y = fbxEuler[1];
-	euler.z = fbxEuler[2];
+	euler.x = (float)fbxEuler[0];
+	euler.y = (float)fbxEuler[1];
+	euler.z = (float)fbxEuler[2];
 	//// Roll (X軸の回転)
 	//double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
 	//double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
@@ -224,30 +224,6 @@ D3DXVECTOR3 D3DXMat2Euler(const D3DXMATRIX& mat)
 	//double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
 	//double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
 	//euler.z = (float)(std::atan2(siny_cosp, cosy_cosp) * 180. / PAI);
-	return euler;
-}
-
-D3DXVECTOR3 D3DXMat2EulerRad(const D3DXMATRIX& mat)
-{
-	D3DXVECTOR3 euler(0., 0., 0.);
-	D3DXQUATERNION q(0., 0., 0., 1.);
-
-	D3DXQuaternionRotationMatrix(&q, &mat);
-
-	// Roll (X軸の回転)
-	double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
-	double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-	euler.x = (float)std::atan2(sinr_cosp, cosr_cosp);
-	// Pitch (Y軸の回転)
-	double sinp = 2 * (q.w * q.y - q.z * q.x);
-	if (std::abs(sinp) >= 1)
-		euler.y = (float)std::copysign(PAI / 2., sinp);	// 90度のクランプ
-	else
-		euler.y = (float)(std::asin(sinp) * 180. / PAI);
-	// Yaw (Z軸の回転)
-	double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-	double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-	euler.z = (float)std::atan2(siny_cosp, cosy_cosp);
 	return euler;
 }
 
@@ -368,8 +344,6 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 			if (string(m_Bones[i].m_Name) == string(pNode->GetName())) break;
 		}
 		if (j >= pScene->GetNodeCount()) continue;
-		int keyNum = m_MotionArray[i].m_RotationKeyNum;
-		if (keyNum <= 0) continue;
 		// 位置アニメーションカーブ
 		FbxAnimCurve* curveTX = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
 		FbxAnimCurve* curveTY = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
@@ -382,56 +356,69 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 		FbxAnimCurve* curveSX = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
 		FbxAnimCurve* curveSY = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
 		FbxAnimCurve* curveSZ = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
-		for (int k = 0; k < keyNum; k++) {
+		int tboneNo = i;
+		int keyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
+		int tkeyNum = keyNum;
+		if (keyNum <= 0) {
+			tboneNo = 0;
+			tkeyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
+		}
+		for (int k = 0; k < tkeyNum; k++) {
 			FbxTime fbxTime;
-			fbxTime.SetSecondDouble(m_MotionArray[i].m_pTranslateKeys[k].Time / 3000.); // 時間を秒単位で設定
+			fbxTime.SetSecondDouble(m_MotionArray[tboneNo].m_pTranslateKeys[k].Time /3000.); // 時間を秒単位で設定
 			D3DXMATRIX iMatrix;
-
-			iMatrix = m_Bones[i].m_mTransform;
-			iMatrix *= *(m_MotionArray[i].GetAnimationMatrix(k, &m_Bones[i].m_mTransform));
+			if (keyNum > 0) {
+				iMatrix = m_Bones[tboneNo].m_mTransform;
+				iMatrix *= *(m_MotionArray[tboneNo].GetAnimationMatrix(k, &m_Bones[tboneNo].m_mTransform));
+			} else {
+				iMatrix = m_Bones[i].m_mTransform;
+			}
 			t = D3DXMat2Trans(iMatrix); s = D3DXMat2Scale(iMatrix);
 			D3DXQuaternionRotationMatrix(&q, &iMatrix); qq.Set(q.x, q.y, q.z, q.w);
 			fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
 			// 位置キーフレーム設定
+			FbxVector4 val = fMat.GetT();
 			curveTX->KeyModifyBegin();
-			curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, (float)fMat.GetT()[0]);
+			curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, (float)val[0]);
 			curveTX->KeyModifyEnd();
 			curveTY->KeyModifyBegin();
-			curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, (float)fMat.GetT()[1]);
+			curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, (float)val[1]);
 			curveTY->KeyModifyEnd();
 			curveTZ->KeyModifyBegin();
-			curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, (float)fMat.GetT()[2]);
+			curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, (float)val[2]);
 			curveTZ->KeyModifyEnd();
+			curveTX->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
+			curveTY->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
+			curveTZ->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
 			// 回転キーフレーム設定 (Quaternion -> Euler 変換が必要な場合あり)
+			val = fMat.GetR();
 			curveRX->KeyModifyBegin();
-			curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, (float)fMat.GetR()[0]);
+			curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, (float)val[0]);
 			curveRX->KeyModifyEnd();
 			curveRY->KeyModifyBegin();
-			curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, (float)fMat.GetR()[1]);
+			curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, (float)val[1]);
 			curveRY->KeyModifyEnd();
 			curveRZ->KeyModifyBegin();
-			curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, (float)fMat.GetR()[2]);
+			curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, (float)val[2]);
 			curveRZ->KeyModifyEnd();
+			curveRX->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
+			curveRY->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
+			curveRZ->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
 			// スケールキーフレーム設定
+			val = fMat.GetS();
 			curveSX->KeyModifyBegin();
-			curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, (float)fMat.GetS()[0]);
+			curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, (float)val[0]);
 			curveSX->KeyModifyEnd();
 			curveSY->KeyModifyBegin();
-			curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, (float)fMat.GetS()[1]);
+			curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, (float)val[1]);
 			curveSY->KeyModifyEnd();
 			curveSZ->KeyModifyBegin();
-			curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, (float)fMat.GetS()[2]);
+			curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, (float)val[2]);
 			curveSZ->KeyModifyEnd();
+			//curveSX->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
+			//curveSY->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
+			//curveSZ->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
 			// 補間法設定
-			curveTX->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveTY->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveTZ->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveRX->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveRY->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveRZ->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveSX->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveSY->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
-			curveSZ->KeySetInterpolation(k,FbxAnimCurveDef::eInterpolationLinear);
 		}
 	}
 	return true;
