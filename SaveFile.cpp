@@ -23,6 +23,7 @@ extern	bool		g_mPCFlag;
 // 検索対象文字列
 int Trim(char* s);
 char* strrstr(const char* string, const char* pattern);// 検索対象文字列を指定する文字列で検索する
+char* strcpynosp(char* string1, char* string2);//空白を除いて文字列をコピーする
 
  //======================================================================
 //		FBXファイルセーブ
@@ -478,7 +479,8 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		strcpy(texName, pMaterial->m_Name);
+		//strcpy(texName, pMaterial->m_Name);
+		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());

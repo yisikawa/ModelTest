@@ -125,15 +125,35 @@ const char *pattern // 検索する文字列
 {
 	// 文字列終端に達するまで検索を繰り返す。
 	const char *last = NULL;
-	{for (const char *p = string; NULL != (p = strstr(p, pattern)); ++p)
 	{
-		last = p;
-		if ('\0' == *p)
-			return (char *)last;
-	}}
+		for (const char *p = string; NULL != (p = strstr(p, pattern)); ++p)
+		{
+			last = p;
+			if ('\0' == *p)
+				return (char *)last;
+		}
+	}
 	return (char *)last;
 }//strrstr
 
+char* // 文字列へのポインタ
+strcpynosp
+(
+	char* string1, // コピー先文字列
+	char* string2 // コピー元文字列
+)
+{
+	char* p = string1;
+	// 文字列終端に達するまでコピーを繰り返す。
+	for (int i=0 ; i<strlen(string2) ; i++ )
+	{
+		if (string2[i] != ' ')
+		{
+			*p++ = string2[i];
+		}
+	}
+	return (char*)string1;
+}//strcpynosp
 //======================================================================
 // 頂点フォーマット
 //======================================================================
