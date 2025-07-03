@@ -23,6 +23,7 @@ extern	bool		g_mPCFlag;
 // 検索対象文字列
 int Trim(char* s);
 char* strrstr(const char* string, const char* pattern);// 検索対象文字列を指定する文字列で検索する
+char* strcpynosp(char* string1, char* string2);//空白を除いて文字列をコピーする
 
  //======================================================================
 //		FBXファイルセーブ
@@ -478,7 +479,8 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		strcpy(texName, pMaterial->m_Name);
+		//strcpy(texName, pMaterial->m_Name);
+		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());
@@ -613,48 +615,48 @@ bool CModel::saveX(char* FPath, char* FName)
 	fprintf(fd, "}\n");
 	std::vector<std::string> strlist;
 	strlist.clear();
-	outputAnimationSet(fd, m_MotionName);
-	//char nameback[8]; strcpy(nameback, m_MotionName);
-	//if (g_mPCFlag) {
-		//CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
-		//int cnt = 0;
-		//while (pMotionFrame) {
-		//	char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-		//	int k = 0;
-		//	for (; k < (int)strlist.size(); k++) {
-		//		if (strlist[k] == mName) break;
-		//	}
-		//	if (k >= (int)strlist.size()) {
-		//		strlist.push_back(mName);
-		//		pPC->SetMotionName(mName);
-		//		pPC->LoadPCMotion();
-		//		outputAnimationSet(fd, mName);
-		//	}
-		//	pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
-		//}
-		//pPC->SetMotionName(nameback);
-		//pPC->LoadPCMotion();
-	//}
-	//else {
-		//CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
-		//int cnt = 0;
-		//while (pMotionFrame) {
-		//	char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-		//	int k = 0;
-		//	for (; k < (int)strlist.size(); k++) {
-		//		if (strlist[k] == mName) break;
-		//	}
-		//	if (k >= (int)strlist.size()) {
-		//		strlist.push_back(mName);
-		//		pNPC->SetMotionName(mName);
-		//		pNPC->LoadNPCMotion();
-		//		outputAnimationSet(fd, mName);
-		//	}
-		//	pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
-		//}
-		//pNPC->SetMotionName(nameback);
-		//pNPC->LoadNPCMotion();
-	//}
+	//outputAnimationSet(fd, m_MotionName);
+	char nameback[8]; strcpy(nameback, m_MotionName);
+	if (g_mPCFlag) {
+		CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
+		int cnt = 0;
+		while (pMotionFrame) {
+			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+			int k = 0;
+			for (; k < (int)strlist.size(); k++) {
+				if (strlist[k] == mName) break;
+			}
+			if (k >= (int)strlist.size()) {
+				strlist.push_back(mName);
+				pPC->SetMotionName(mName);
+				pPC->LoadPCMotion();
+				outputAnimationSet(fd, mName);
+			}
+			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+		}
+		pPC->SetMotionName(nameback);
+		pPC->LoadPCMotion();
+	}
+	else {
+		CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
+		int cnt = 0;
+		while (pMotionFrame) {
+			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+			int k = 0;
+			for (; k < (int)strlist.size(); k++) {
+				if (strlist[k] == mName) break;
+			}
+			if (k >= (int)strlist.size()) {
+				strlist.push_back(mName);
+				pNPC->SetMotionName(mName);
+				pNPC->LoadNPCMotion();
+				outputAnimationSet(fd, mName);
+			}
+			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+		}
+		pNPC->SetMotionName(nameback);
+		pNPC->LoadNPCMotion();
+	}
 	fclose(fd);
 	strlist.clear();
 	return true;
@@ -707,7 +709,10 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		char texName[256]; strcpy(texName, pMaterial->m_Name); Trim(texName);
+		char texName[256];
+		//strcpy(texName, pMaterial->m_Name);
+		strcpynosp(texName, pMaterial->m_Name);
+		Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
