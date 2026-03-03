@@ -743,7 +743,7 @@ bool CModel::outputMultiMeshX(char* FPath, char* FName, FILE* fd) {
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		char texName[256]; strcpy(texName, pMaterial->m_Name); Trim(texName);
+		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
@@ -1349,7 +1349,7 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 		fprintf(fd, " 0.000;0.000;0.000;;\n");
 		fprintf(fd, " TextureFilename {\n");
 		//		fprintf(fd, " \"%s%02d.bmp\";\n", FName, count);
-		char texName[256]; strcpy(texName, pMaterial->m_Name); Trim(texName);
+		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
 		fprintf(fd, " \"%s.bmp\";\n", texName);
 		fprintf(fd, "}\n");
 		fprintf(fd, "}\n");

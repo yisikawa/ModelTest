@@ -151,6 +151,7 @@ strcpynosp
 			*p++ = string2[i];
 		}
 	}
+	if( *p != '\0' ) *p='\0';
 	return (char*)string1;
 }//strcpynosp
 
