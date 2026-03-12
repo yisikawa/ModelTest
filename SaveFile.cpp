@@ -384,6 +384,8 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 		curveRX->KeyModifyBegin(); curveRY->KeyModifyBegin(); curveRZ->KeyModifyBegin();
 		curveSX->KeyModifyBegin(); curveSY->KeyModifyBegin(); curveSZ->KeyModifyBegin();
 
+		FbxVector4 lastEuler(0.0, 0.0, 0.0); // 【修正】直前のオイラー角を保存
+
 		for (int k = 0; k < tkeyNum; k++) {
 			FbxTime fbxTime;
 			fbxTime.SetSecondDouble(m_MotionArray[tboneNo].m_pTranslateKeys[k].Time / 3000.); // 時間を秒単位で設定
@@ -420,6 +422,18 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 
 			// 回転キーフレーム設定
 			val = fMat.GetR();
+			
+			// 【修正】オイラー角のフリップ（360度回転異常）を防ぐためのUnroll処理
+			if (k > 0) {
+				for (int axis = 0; axis < 3; axis++) {
+					double diff = val[axis] - lastEuler[axis];
+					while (diff > 180.0) diff -= 360.0;
+					while (diff < -180.0) diff += 360.0;
+					val[axis] = lastEuler[axis] + diff;
+				}
+			}
+			lastEuler = val;
+
 			int idxRX = curveRX->KeyInsert(fbxTime);
 			curveRX->KeySetValue(idxRX, (float)val[0]);
 			curveRX->KeySetInterpolation(idxRX, FbxAnimCurveDef::eInterpolationLinear);
@@ -555,48 +569,48 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	std::vector<std::string> strlist;
 	strlist.clear();
 	//　アニメーション出力
-	outputFBXAnimation(fbxScene);
-	//char nameback[8]; strcpy(nameback, m_MotionName);
-	//if (g_mPCFlag) {
-	//	CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
-	//	int cnt = 0;
-	//	while (pMotionFrame) {
-	//		char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-	//		int k = 0;
-	//		for (; k < (int)strlist.size(); k++) {
-	//			if (strlist[k] == mName) break;
-	//		}
-	//		if (k >= (int)strlist.size()) {
-	//			strlist.push_back(mName);
-	//			pPC->SetMotionName(mName);
-	//			pPC->LoadPCMotion();
-	//			outputFBXAnimation(fbxScene);
-	//		}
-	//		pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
-	//	}
-	//	pPC->SetMotionName(nameback);
-	//	pPC->LoadPCMotion();
-	//}
-	//else {
-	//	CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
-	//	int cnt = 0;
-	//	while (pMotionFrame) {
-	//		char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-	//		int k = 0;
-	//		for (; k < (int)strlist.size(); k++) {
-	//			if (strlist[k] == mName) break;
-	//		}
-	//		if (k >= (int)strlist.size()) {
-	//			strlist.push_back(mName);
-	//			pNPC->SetMotionName(mName);
-	//			pNPC->LoadNPCMotion();
-	//			outputFBXAnimation(fbxScene);
-	//		}
-	//		pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
-	//	}
-	//	pNPC->SetMotionName(nameback);
-	//	pNPC->LoadNPCMotion();
-	//}
+	//outputFBXAnimation(fbxScene);
+	char nameback[8]; strcpy(nameback, m_MotionName);
+	if (g_mPCFlag) {
+		CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
+		int cnt = 0;
+		while (pMotionFrame) {
+			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+			int k = 0;
+			for (; k < (int)strlist.size(); k++) {
+				if (strlist[k] == mName) break;
+			}
+			if (k >= (int)strlist.size()) {
+				strlist.push_back(mName);
+				pPC->SetMotionName(mName);
+				pPC->LoadPCMotion();
+				outputFBXAnimation(fbxScene);
+			}
+			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+		}
+		pPC->SetMotionName(nameback);
+		pPC->LoadPCMotion();
+	}
+	else {
+		CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
+		int cnt = 0;
+		while (pMotionFrame) {
+			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+			int k = 0;
+			for (; k < (int)strlist.size(); k++) {
+				if (strlist[k] == mName) break;
+			}
+			if (k >= (int)strlist.size()) {
+				strlist.push_back(mName);
+				pNPC->SetMotionName(mName);
+				pNPC->LoadNPCMotion();
+				outputFBXAnimation(fbxScene);
+			}
+			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+		}
+		pNPC->SetMotionName(nameback);
+		pNPC->LoadNPCMotion();
+	}
 	// --- FBXファイルのエクスポート ---
 	int fileFormat=0,lFormatIndex=0, lFormatCount=0;
 	lFormatCount = fbxManager->GetIOPluginRegistry()->GetWriterFormatCount();
