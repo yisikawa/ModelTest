@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 using namespace std;
 using namespace fbxsdk;
@@ -325,7 +326,6 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 
 	// アニメーションセット出力
 	string motionName;
-	/*FbxAnimLayer* animLayer = FbxAnimLayer::Create(fbxScene, "BaseAnimationLayer");*/
 
 	if (g_mPCFlag) {
 		motionName = string(pPC->GetMotionName());
@@ -337,19 +337,27 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(pScene, (motionName + "_L").c_str());
 	pAnimStack->AddMember(pAnimLayer);
 
-	int j;
+	// 【修正1】ノード名→FbxNodeのマップを事前構築（O(N2)→O(N)に改善）
+	std::unordered_map<std::string, FbxNode*> nodeMap;
+	for (int j = 0; j < pScene->GetNodeCount(); j++) {
+		FbxNode* pN = pScene->GetNode(j);
+		if (pN) {
+			nodeMap[std::string(pN->GetName())] = pN;
+		}
+	}
+
 	FbxNode* pNode;
 	for (int i = 0; i < m_nBone; i++) {
-		for (j = 0; j < pScene->GetNodeCount(); j++) {
-			pNode = pScene->GetNode(j);
-			if (string(m_Bones[i].m_Name) == string(pNode->GetName())) break;
-		}
-		if (j >= pScene->GetNodeCount()) continue;
+		// 【修正1】マップによるO(1)検索
+		auto it = nodeMap.find(std::string(m_Bones[i].m_Name));
+		if (it == nodeMap.end()) continue;	// 見つからなければスキップ
+		pNode = it->second;
+
 		// 位置アニメーションカーブ
 		FbxAnimCurve* curveTX = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
 		FbxAnimCurve* curveTY = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
 		FbxAnimCurve* curveTZ = pNode->LclTranslation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
-		// 回転アニメーションカーブ (Quaternion -> Euler 変換が必要な場合あり)
+		// 回転アニメーションカーブ
 		FbxAnimCurve* curveRX = pNode->LclRotation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
 		FbxAnimCurve* curveRY = pNode->LclRotation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
 		FbxAnimCurve* curveRZ = pNode->LclRotation.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
@@ -357,70 +365,88 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 		FbxAnimCurve* curveSX = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_X, true);
 		FbxAnimCurve* curveSY = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Y, true);
 		FbxAnimCurve* curveSZ = pNode->LclScaling.GetCurve(pAnimLayer, FBXSDK_CURVENODE_COMPONENT_Z, true);
+
 		int tboneNo = i;
 		int keyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
 		int tkeyNum = keyNum;
+		// 【修正4】キーフレーム数0のフォールバックに安全チェックを追加
 		if (keyNum <= 0) {
 			tboneNo = 0;
 			tkeyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
+			// ボーン0にもキーがない、またはキーデータがNULLの場合はスキップ
+			if (tkeyNum <= 0 || m_MotionArray[tboneNo].m_pTranslateKeys == NULL) {
+				continue;
+			}
 		}
+
+		// 【修正3】KeyModifyBegin はループの外で1回だけ呼ぶ
+		curveTX->KeyModifyBegin(); curveTY->KeyModifyBegin(); curveTZ->KeyModifyBegin();
+		curveRX->KeyModifyBegin(); curveRY->KeyModifyBegin(); curveRZ->KeyModifyBegin();
+		curveSX->KeyModifyBegin(); curveSY->KeyModifyBegin(); curveSZ->KeyModifyBegin();
+
 		for (int k = 0; k < tkeyNum; k++) {
 			FbxTime fbxTime;
-			fbxTime.SetSecondDouble(m_MotionArray[tboneNo].m_pTranslateKeys[k].Time /3000.); // 時間を秒単位で設定
+			fbxTime.SetSecondDouble(m_MotionArray[tboneNo].m_pTranslateKeys[k].Time / 3000.); // 時間を秒単位で設定
 			D3DXMATRIX iMatrix;
 			if (keyNum > 0) {
-				iMatrix = m_Bones[tboneNo].m_mTransform;
-				iMatrix *= *(m_MotionArray[tboneNo].GetAnimationMatrix(k, &m_Bones[tboneNo].m_mTransform));
+				// 【修正7】GetAnimationMatrix のNULLチェック
+				D3DXMATRIX* pAnimMat = m_MotionArray[tboneNo].GetAnimationMatrix(k, &m_Bones[tboneNo].m_mTransform);
+				if (pAnimMat != NULL) {
+					iMatrix = m_Bones[tboneNo].m_mTransform;
+					iMatrix *= *pAnimMat;
+				} else {
+					// アニメーション行列が取得できない場合はバインドポーズをそのまま使用
+					iMatrix = m_Bones[tboneNo].m_mTransform;
+				}
 			} else {
 				iMatrix = m_Bones[i].m_mTransform;
 			}
 			t = D3DXMat2Trans(iMatrix); s = D3DXMat2Scale(iMatrix);
 			D3DXQuaternionRotationMatrix(&q, &iMatrix); qq.Set(q.x, q.y, q.z, q.w);
 			fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
+
+			// 【修正2】KeyInsert の戻り値をインデックスとして使用
 			// 位置キーフレーム設定
 			FbxVector4 val = fMat.GetT();
-			curveTX->KeyModifyBegin();
-			curveTX->KeyInsert(fbxTime); curveTX->KeySetValue(k, (float)val[0]);
-			curveTX->KeyModifyEnd();
-			curveTY->KeyModifyBegin();
-			curveTY->KeyInsert(fbxTime); curveTY->KeySetValue(k, (float)val[1]);
-			curveTY->KeyModifyEnd();
-			curveTZ->KeyModifyBegin();
-			curveTZ->KeyInsert(fbxTime); curveTZ->KeySetValue(k, (float)val[2]);
-			curveTZ->KeyModifyEnd();
-			curveTX->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			curveTY->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			curveTZ->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			// 回転キーフレーム設定 (Quaternion -> Euler 変換が必要な場合あり)
+			int idxTX = curveTX->KeyInsert(fbxTime);
+			curveTX->KeySetValue(idxTX, (float)val[0]);
+			curveTX->KeySetInterpolation(idxTX, FbxAnimCurveDef::eInterpolationLinear);
+			int idxTY = curveTY->KeyInsert(fbxTime);
+			curveTY->KeySetValue(idxTY, (float)val[1]);
+			curveTY->KeySetInterpolation(idxTY, FbxAnimCurveDef::eInterpolationLinear);
+			int idxTZ = curveTZ->KeyInsert(fbxTime);
+			curveTZ->KeySetValue(idxTZ, (float)val[2]);
+			curveTZ->KeySetInterpolation(idxTZ, FbxAnimCurveDef::eInterpolationLinear);
+
+			// 回転キーフレーム設定
 			val = fMat.GetR();
-			curveRX->KeyModifyBegin();
-			curveRX->KeyInsert(fbxTime); curveRX->KeySetValue(k, (float)val[0]);
-			curveRX->KeyModifyEnd();
-			curveRY->KeyModifyBegin();
-			curveRY->KeyInsert(fbxTime); curveRY->KeySetValue(k, (float)val[1]);
-			curveRY->KeyModifyEnd();
-			curveRZ->KeyModifyBegin();
-			curveRZ->KeyInsert(fbxTime); curveRZ->KeySetValue(k, (float)val[2]);
-			curveRZ->KeyModifyEnd();
-			curveRX->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			curveRY->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			curveRZ->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			// スケールキーフレーム設定
+			int idxRX = curveRX->KeyInsert(fbxTime);
+			curveRX->KeySetValue(idxRX, (float)val[0]);
+			curveRX->KeySetInterpolation(idxRX, FbxAnimCurveDef::eInterpolationLinear);
+			int idxRY = curveRY->KeyInsert(fbxTime);
+			curveRY->KeySetValue(idxRY, (float)val[1]);
+			curveRY->KeySetInterpolation(idxRY, FbxAnimCurveDef::eInterpolationLinear);
+			int idxRZ = curveRZ->KeyInsert(fbxTime);
+			curveRZ->KeySetValue(idxRZ, (float)val[2]);
+			curveRZ->KeySetInterpolation(idxRZ, FbxAnimCurveDef::eInterpolationLinear);
+
+			// 【修正6】スケールキーフレーム設定（補間設定も有効化して統一）
 			val = fMat.GetS();
-			curveSX->KeyModifyBegin();
-			curveSX->KeyInsert(fbxTime); curveSX->KeySetValue(k, (float)val[0]);
-			curveSX->KeyModifyEnd();
-			curveSY->KeyModifyBegin();
-			curveSY->KeyInsert(fbxTime); curveSY->KeySetValue(k, (float)val[1]);
-			curveSY->KeyModifyEnd();
-			curveSZ->KeyModifyBegin();
-			curveSZ->KeyInsert(fbxTime); curveSZ->KeySetValue(k, (float)val[2]);
-			curveSZ->KeyModifyEnd();
-			//curveSX->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			//curveSY->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			//curveSZ->KeySetInterpolation(k, FbxAnimCurveDef::eInterpolationLinear);
-			// 補間法設定
+			int idxSX = curveSX->KeyInsert(fbxTime);
+			curveSX->KeySetValue(idxSX, (float)val[0]);
+			curveSX->KeySetInterpolation(idxSX, FbxAnimCurveDef::eInterpolationLinear);
+			int idxSY = curveSY->KeyInsert(fbxTime);
+			curveSY->KeySetValue(idxSY, (float)val[1]);
+			curveSY->KeySetInterpolation(idxSY, FbxAnimCurveDef::eInterpolationLinear);
+			int idxSZ = curveSZ->KeyInsert(fbxTime);
+			curveSZ->KeySetValue(idxSZ, (float)val[2]);
+			curveSZ->KeySetInterpolation(idxSZ, FbxAnimCurveDef::eInterpolationLinear);
 		}
+
+		// 【修正3】KeyModifyEnd はループの外で1回だけ呼ぶ
+		curveTX->KeyModifyEnd(); curveTY->KeyModifyEnd(); curveTZ->KeyModifyEnd();
+		curveRX->KeyModifyEnd(); curveRY->KeyModifyEnd(); curveRZ->KeyModifyEnd();
+		curveSX->KeyModifyEnd(); curveSY->KeyModifyEnd(); curveSZ->KeyModifyEnd();
 	}
 	return true;
 }
@@ -526,8 +552,51 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	pLayer->SetMaterials(pMaterialElement);
 	//	ボーン出力
 	outputFBXBone(rootNode, fbxScene, cubeMesh);
+	std::vector<std::string> strlist;
+	strlist.clear();
 	//　アニメーション出力
 	outputFBXAnimation(fbxScene);
+	//char nameback[8]; strcpy(nameback, m_MotionName);
+	//if (g_mPCFlag) {
+	//	CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
+	//	int cnt = 0;
+	//	while (pMotionFrame) {
+	//		char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+	//		int k = 0;
+	//		for (; k < (int)strlist.size(); k++) {
+	//			if (strlist[k] == mName) break;
+	//		}
+	//		if (k >= (int)strlist.size()) {
+	//			strlist.push_back(mName);
+	//			pPC->SetMotionName(mName);
+	//			pPC->LoadPCMotion();
+	//			outputFBXAnimation(fbxScene);
+	//		}
+	//		pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+	//	}
+	//	pPC->SetMotionName(nameback);
+	//	pPC->LoadPCMotion();
+	//}
+	//else {
+	//	CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
+	//	int cnt = 0;
+	//	while (pMotionFrame) {
+	//		char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+	//		int k = 0;
+	//		for (; k < (int)strlist.size(); k++) {
+	//			if (strlist[k] == mName) break;
+	//		}
+	//		if (k >= (int)strlist.size()) {
+	//			strlist.push_back(mName);
+	//			pNPC->SetMotionName(mName);
+	//			pNPC->LoadNPCMotion();
+	//			outputFBXAnimation(fbxScene);
+	//		}
+	//		pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+	//	}
+	//	pNPC->SetMotionName(nameback);
+	//	pNPC->LoadNPCMotion();
+	//}
 	// --- FBXファイルのエクスポート ---
 	int fileFormat=0,lFormatIndex=0, lFormatCount=0;
 	lFormatCount = fbxManager->GetIOPluginRegistry()->GetWriterFormatCount();
@@ -615,48 +684,48 @@ bool CModel::saveX(char* FPath, char* FName)
 	fprintf(fd, "}\n");
 	std::vector<std::string> strlist;
 	strlist.clear();
-	outputAnimationSet(fd, m_MotionName);
-	//char nameback[8]; strcpy(nameback, m_MotionName);
-	//if (g_mPCFlag) {
-		//CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
-		//int cnt = 0;
-		//while (pMotionFrame) {
-		//	char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-		//	int k = 0;
-		//	for (; k < (int)strlist.size(); k++) {
-		//		if (strlist[k] == mName) break;
-		//	}
-		//	if (k >= (int)strlist.size()) {
-		//		strlist.push_back(mName);
-		//		pPC->SetMotionName(mName);
-		//		pPC->LoadPCMotion();
-		//		outputAnimationSet(fd, mName);
-		//	}
-		//	pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
-		//}
-		//pPC->SetMotionName(nameback);
-		//pPC->LoadPCMotion();
-	//}
-	//else {
-		//CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
-		//int cnt = 0;
-		//while (pMotionFrame) {
-		//	char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-		//	int k = 0;
-		//	for (; k < (int)strlist.size(); k++) {
-		//		if (strlist[k] == mName) break;
-		//	}
-		//	if (k >= (int)strlist.size()) {
-		//		strlist.push_back(mName);
-		//		pNPC->SetMotionName(mName);
-		//		pNPC->LoadNPCMotion();
-		//		outputAnimationSet(fd, mName);
-		//	}
-		//	pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
-		//}
-		//pNPC->SetMotionName(nameback);
-		//pNPC->LoadNPCMotion();
-	//}
+	//outputAnimationSet(fd, m_MotionName);
+	char nameback[8]; strcpy(nameback, m_MotionName);
+	if (g_mPCFlag) {
+		CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
+		int cnt = 0;
+		while (pMotionFrame) {
+			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+			int k = 0;
+			for (; k < (int)strlist.size(); k++) {
+				if (strlist[k] == mName) break;
+			}
+			if (k >= (int)strlist.size()) {
+				strlist.push_back(mName);
+				pPC->SetMotionName(mName);
+				pPC->LoadPCMotion();
+				outputAnimationSet(fd, mName);
+			}
+			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+		}
+		pPC->SetMotionName(nameback);
+		pPC->LoadPCMotion();
+	}
+	else {
+		CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
+		int cnt = 0;
+		while (pMotionFrame) {
+			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+			int k = 0;
+			for (; k < (int)strlist.size(); k++) {
+				if (strlist[k] == mName) break;
+			}
+			if (k >= (int)strlist.size()) {
+				strlist.push_back(mName);
+				pNPC->SetMotionName(mName);
+				pNPC->LoadNPCMotion();
+				outputAnimationSet(fd, mName);
+			}
+			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+		}
+		pNPC->SetMotionName(nameback);
+		pNPC->LoadNPCMotion();
+	}
 	fclose(fd);
 	strlist.clear();
 	return true;
