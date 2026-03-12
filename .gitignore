@@ -4,3 +4,4 @@ ModelTest.vcxproj.user
 Release/
 Debug/
 libfbxsdk.dll
+libfdxsdk.dll

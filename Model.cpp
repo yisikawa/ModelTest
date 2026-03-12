@@ -125,13 +125,11 @@ const char *pattern // 検索する文字列
 {
 	// 文字列終端に達するまで検索を繰り返す。
 	const char *last = NULL;
+	for (const char *p = string; NULL != (p = strstr(p, pattern)); ++p)
 	{
-		for (const char *p = string; NULL != (p = strstr(p, pattern)); ++p)
-		{
-			last = p;
-			if ('\0' == *p)
-				return (char *)last;
-		}
+		last = p;
+		if ('\0' == *p)
+			return (char *)last;
 	}
 	return (char *)last;
 }//strrstr
@@ -145,13 +143,14 @@ strcpynosp
 {
 	char* p = string1;
 	// 文字列終端に達するまでコピーを繰り返す。
-	for (int i=0 ; i<strlen(string2) ; i++ )
+	for (int i = 0; i < strlen(string2); i++)
 	{
 		if (string2[i] != ' ')
 		{
 			*p++ = string2[i];
 		}
 	}
+	if( *p != '\0' ) *p='\0';
 	return (char*)string1;
 }//strcpynosp
 //======================================================================

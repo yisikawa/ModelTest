@@ -55,10 +55,10 @@ bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 		CUSTOMVERTEX* pV1;
 		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++) {
-			if (fabs(pV1->p.x) > 10000.0 || fabs(pV1->p.y) > 10000.0 || fabs(pV1->p.z) > 10000.0) {
-				pV1->p.x = pV1->p.y = pV1->p.z = pV1->n.x = pV1->n.y = pV1->n.z = 0.;
-				pV1->u = pV1->v = pV1->b1 = 0.; pV1->indx = 0;
-			}
+			// if (fabs(pV1->p.x) > 10000.0 || fabs(pV1->p.y) > 10000.0 || fabs(pV1->p.z) > 10000.0) {
+// 				pV1->p.x = pV1->p.y = pV1->p.z = pV1->n.x = pV1->n.y = pV1->n.z = 0.;
+// 				pV1->u = pV1->v = pV1->b1 = 0.; pV1->indx = 0;
+			//}
 			vert.x = pV1->p.x; vert.y = pV1->p.y; vert.z = pV1->p.z;
 			D3DXVec3TransformCoord(&vert, &vert, &rootMatrix);
 			pfbxMesh->SetControlPointAt(FbxVector4(vert.x, vert.y, vert.z), no); no++;
@@ -778,7 +778,10 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		char texName[256]; strcpy(texName, pMaterial->m_Name); Trim(texName);
+		char texName[256];
+		//strcpy(texName, pMaterial->m_Name);
+		strcpynosp(texName, pMaterial->m_Name);
+		Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
@@ -809,7 +812,7 @@ bool CModel::outputMultiMeshX(char* FPath, char* FName, FILE* fd) {
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		char texName[256]; strcpy(texName, pMaterial->m_Name); Trim(texName);
+		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
 		sprintf(texpath, "%s%s.bmp", fpath, texName);
 		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
@@ -1415,7 +1418,7 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 		fprintf(fd, " 0.000;0.000;0.000;;\n");
 		fprintf(fd, " TextureFilename {\n");
 		//		fprintf(fd, " \"%s%02d.bmp\";\n", FName, count);
-		char texName[256]; strcpy(texName, pMaterial->m_Name); Trim(texName);
+		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
 		fprintf(fd, " \"%s.bmp\";\n", texName);
 		fprintf(fd, "}\n");
 		fprintf(fd, "}\n");
@@ -1627,21 +1630,21 @@ bool CModel::outputMesh(FILE* fd)
 	//	Face出力
 	if (countParts(1) > 0) {
 		fprintf(fd, "Object \"%s\" {\n", objname[0]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 1, 2);
 		fprintf(fd, "}\n");
 	}
 	//	Head出力
 	if (countParts(2) > 0) {
 		fprintf(fd, "Object \"%s\" {\n", objname[1]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 2, 2);
 		fprintf(fd, "}\n");
 	}
 	//	Body出力
 	if (countParts(3) > 0) {
 		fprintf(fd, "Object \"%s\" {\n", objname[2]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 3, 2);
 		fprintf(fd, "}\n");
 	}
@@ -1649,19 +1652,19 @@ bool CModel::outputMesh(FILE* fd)
 	if (countParts(4) > 0) {
 		// 右手出力
 		fprintf(fd, "Object \"%sR\" {\n", objname[3]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 4, 0);
 		fprintf(fd, "}\n");
 		// 左手出力
 		fprintf(fd, "Object \"%sL\" {\n", objname[3]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 4, 1);
 		fprintf(fd, "}\n");
 	}
 	//	Legs出力
 	if (countParts(5) > 0) {
 		fprintf(fd, "Object \"%s\" {\n", objname[4]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 5, 2);
 		fprintf(fd, "}\n");
 	}
@@ -1669,12 +1672,12 @@ bool CModel::outputMesh(FILE* fd)
 	if (countParts(6) > 0) {
 		// 右手出力
 		fprintf(fd, "Object \"%sR\" {\n", objname[5]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 6, 0);
 		fprintf(fd, "}\n");
 		// 左手出力
 		fprintf(fd, "Object \"%sL\" {\n", objname[5]);
-		fprintf(fd, "    visivle 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
+		fprintf(fd, "    visible 15\n    locking 0\n    shading 1\n   facet 59.5\n    color 0.898 0.498 0.698\n   color_type 0\n");
 		outputVerFace(fd, 6, 1);
 		fprintf(fd, "}\n");
 	}
@@ -1733,14 +1736,17 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
 			indx = pV1->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
 			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
-			p1.x = pV1->p.x; p1.y = pV1->p.y; p1.z = pV1->p.z; p1.w = pV1->b1;
-			D3DXVec4Transform(&p1, &p1, &mat);
+			indx = pV1->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
+			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
+			D3DXVECTOR3 v1(pV1->p.x, pV1->p.y, pV1->p.z);
+			D3DXVec3TransformCoord(&v1, &v1, &mat);
 			indx = pV2->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
 			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
-			p2.x = pV2->p.x; p2.y = pV2->p.y; p2.z = pV2->p.z; p2.w = pV2->b1;
-			D3DXVec4Transform(&p2, &p2, &mat);
-			//pos=(p1+p2)*500.f;
-			pos = (p1 + p2) * 100.f;
+			D3DXVECTOR3 v2(pV2->p.x, pV2->p.y, pV2->p.z);
+			D3DXVec3TransformCoord(&v2, &v2, &mat);
+			pos.x = (v1.x * pV1->b1 + v2.x * pV2->b1) * 100.0f;
+			pos.y = (v1.y * pV1->b1 + v2.y * pV2->b1) * 100.0f;
+			pos.z = (v1.z * pV1->b1 + v2.z * pV2->b1) * 100.0f;
 			fprintf(fd, "        %4.4f %4.4f %4.4f\n", pos.x, pos.y, pos.z);
 		}
 		(pMesh->m_lpVB2)->Unlock();
