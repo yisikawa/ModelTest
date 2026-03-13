@@ -336,6 +336,9 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 	FbxAnimStack* pAnimStack = FbxAnimStack::Create(pScene, (motionName + "_S").c_str());
 	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(pScene, (motionName + "_L").c_str());
 	pAnimStack->AddMember(pAnimLayer);
+    FbxTime fbxStart, fbxEnd;
+    fbxStart.SetSecondDouble(0.0);
+    fbxEnd.SetSecondDouble(0.0);
 
 	// 【修正1】ノード名→FbxNodeのマップを事前構築（O(N2)→O(N)に改善）
 	std::unordered_map<std::string, FbxNode*> nodeMap;
@@ -389,6 +392,7 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 		for (int k = 0; k < tkeyNum; k++) {
 			FbxTime fbxTime;
 			fbxTime.SetSecondDouble(m_MotionArray[tboneNo].m_pTranslateKeys[k].Time / 3000.); // 時間を秒単位で設定
+                    if (fbxTime > fbxEnd) fbxEnd = fbxTime;
 			D3DXMATRIX iMatrix;
 			if (keyNum > 0) {
 				// 【修正7】GetAnimationMatrix のNULLチェック
@@ -462,6 +466,9 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 		curveRX->KeyModifyEnd(); curveRY->KeyModifyEnd(); curveRZ->KeyModifyEnd();
 		curveSX->KeyModifyEnd(); curveSY->KeyModifyEnd(); curveSZ->KeyModifyEnd();
 	}
+
+    pAnimStack->LocalStart.Set(fbxStart);
+    pAnimStack->LocalStop.Set(fbxEnd);
 	return true;
 }
 
