@@ -333,8 +333,8 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 	else {
 		motionName = string(pNPC->GetMotionName());
 	}
-	FbxAnimStack* pAnimStack = FbxAnimStack::Create(pScene, (motionName + "_S").c_str());
-	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(pScene, (motionName + "_L").c_str());
+	FbxAnimStack* pAnimStack = FbxAnimStack::Create(pScene, motionName.c_str());
+	FbxAnimLayer* pAnimLayer = FbxAnimLayer::Create(pScene, motionName.c_str());
 	pAnimStack->AddMember(pAnimLayer);
     FbxTime fbxStart, fbxEnd;
     fbxStart.SetSecondDouble(0.0);
