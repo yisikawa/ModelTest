@@ -3,5 +3,8 @@ ModelTest.vcxproj
 ModelTest.vcxproj.user
 Release/
 Debug/
+aldoData/
+fbxData/
+fbxdata2/
 libfbxsdk.dll
 libfdxsdk.dll
