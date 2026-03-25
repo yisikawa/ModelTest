@@ -2632,7 +2632,7 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 	int dwSize;
 	unsigned long	cnt;
 
-	strncpy(path, FileName, strlen(FileName));
+	strcpy(path, FileName);
 	convert_tex_path(path);
 	HANDLE	hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
@@ -2641,8 +2641,9 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 	    ReadFile(hFile,pdat,dwSize,&cnt,NULL);
 	    CloseHandle(hFile);
 		hr = 0;
-	} else {
-		return -1;
+	}
+	else {
+			return -1;
 	}
 
 	//====================================================
