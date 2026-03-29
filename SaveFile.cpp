@@ -498,6 +498,8 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		fbxManager->Destroy();
 		return false;
 	}
+	// Coordinate conversion (DirectX LHS to FBX RHS)
+	//FbxAxisSystem(FbxAxisSystem::eDirectX).ConvertScene(fbxScene);
 	// GlobalSettings‚ðŽæ“¾
 	FbxGlobalSettings& globalSettings = fbxScene->GetGlobalSettings();
 	FbxSystemUnit systemUnit(100.);
