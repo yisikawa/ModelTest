@@ -1130,7 +1130,7 @@ bool CModel::outputFace(FILE* fd) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
 					if (i % 2) {
-						if (pMesh->m_FlipFlag) {
+						if (!pMesh->m_FlipFlag) {
 							t1 = i3; t2 = i2; t3 = i1;
 						}
 						else {
@@ -1138,7 +1138,7 @@ bool CModel::outputFace(FILE* fd) {
 						}
 					}
 					else {
-						if (pMesh->m_FlipFlag) {
+						if (!pMesh->m_FlipFlag) {
 							t1 = i1; t2 = i2; t3 = i3;
 						}
 						else {
@@ -1156,7 +1156,7 @@ bool CModel::outputFace(FILE* fd) {
 			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
-					if (pMesh->m_FlipFlag) {
+					if (!pMesh->m_FlipFlag) {
 						t1 = i1; t2 = i2; t3 = i3;
 					}
 					else {
