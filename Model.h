@@ -1,4 +1,4 @@
-﻿
+
 #pragma once
 
 //======================================================================
@@ -499,12 +499,22 @@ typedef struct {
 //======================================================================
 // モデルクラス
 //======================================================================
+struct WELDED_VERTEX {
+	D3DXVECTOR3 p;
+	D3DXVECTOR3 n;
+	float u, v;
+	int globalBones[4];
+	float weights[4];
+	int originalIndex;
+};
+
 typedef class CModel : public CData
 {
 protected:
 	char					m_MotionName[64];
 	CList					m_Meshs;
 	std::vector<int>		m_vertexRemap;
+	std::vector<WELDED_VERTEX> m_weldedVertices;
 
 public:
 	CList					m_motions;
@@ -536,6 +546,7 @@ public:
 	virtual int		totalVertex(void);
 	virtual int		totalFace(void);
 	virtual int		countBone2Ver(int boneNo);
+	virtual void	OptimizeVertices(void);
 	virtual bool	outputBone2VerNo(FILE *fd, int boneNo);
 	virtual bool	outputBone2VerWeight(FILE *fd, int boneNo);
 	virtual bool	saveX(char *FPath, char *FName);

@@ -30,13 +30,87 @@ char* strcpynosp(char* string1, char* string2);//空白を除いて文字列をコピーする
 //		FBXファイルセーブ
 //		データをFBXフォーマットで出力します
 //======================================================================
-struct UniqueVertex {
-	D3DXVECTOR3 pos;
-	D3DXVECTOR3 norm;
-	float u, v;
-	float b1_1, b1_2;
-	int global_bone_1, global_bone_2;
-};
+void CModel::OptimizeVertices(void) {
+	int numVer = totalVertex();
+	if (m_vertexRemap.size() == numVer && m_weldedVertices.size() > 0) {
+		return;
+	}
+	m_vertexRemap.assign(numVer, -1);
+	m_weldedVertices.clear();
+
+	std::unordered_map<long long, std::vector<int>> spatialHash;
+	const float GRID_SIZE = 0.01f;
+	const float THRESHOLD_SQ = 0.0001f * 0.0001f;
+
+	unsigned int originalNo = 0;
+	CMesh* pMesh = (CMesh*)m_Meshs.Top();
+	while (pMesh != NULL) {
+		CUSTOMVERTEX* pV1, * pV2;
+		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
+		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
+		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++, originalNo++) {
+			D3DXVECTOR3 vert(pV1->p.x, pV1->p.y, pV1->p.z);
+			D3DXVECTOR3 norm(pV1->n.x, pV1->n.y, pV1->n.z);
+
+			if (fabs(vert.x) > 10000.0 || fabs(vert.y) > 10000.0 || fabs(vert.z) > 10000.0) {
+				vert.x = 0; vert.y = 0; vert.z = 0;
+				norm.x = 0; norm.y = 0; norm.z = 0;
+				pV1->u = 0; pV1->v = 0;
+			}
+
+			float u = (pV1->u < 0.0f) ? 0.0f : (pV1->u > 1.0f ? 1.0f : pV1->u);
+			float v = (pV1->v < 0.0f) ? 0.0f : (pV1->v > 1.0f ? 1.0f : pV1->v);
+			
+			float b1_1 = pV1->b1;
+			int global_bone_1 = (b1_1 > 0.0f) ? pMesh->m_pBoneTbl[pV1->indx] : -1;
+			float b1_2 = pV2->b1;
+			int global_bone_2 = (b1_2 > 0.0f) ? pMesh->m_pBoneTbl[pV2->indx] : -1;
+
+			long long hx = (long long)std::floor(vert.x / GRID_SIZE);
+			long long hy = (long long)std::floor(vert.y / GRID_SIZE);
+			long long hz = (long long)std::floor(vert.z / GRID_SIZE);
+			long long hashKey = (hx * 73856093LL) ^ (hy * 19349663LL) ^ (hz * 83492791LL);
+
+			int foundIndex = -1;
+			if (spatialHash.count(hashKey)) {
+				for (int idx : spatialHash[hashKey]) {
+					const WELDED_VERTEX& uvtx = m_weldedVertices[idx];
+					if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
+						if (D3DXVec3LengthSq(&(norm - uvtx.n)) <= THRESHOLD_SQ) {
+							if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
+								if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
+									global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
+									foundIndex = idx;
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (foundIndex == -1) {
+				foundIndex = (int)m_weldedVertices.size();
+				WELDED_VERTEX newVtx;
+				newVtx.p = vert;
+				newVtx.n = norm;
+				newVtx.u = u;
+				newVtx.v = v;
+				newVtx.weights[0] = b1_1;
+				newVtx.weights[1] = b1_2;
+				newVtx.globalBones[0] = global_bone_1;
+				newVtx.globalBones[1] = global_bone_2;
+				newVtx.originalIndex = originalNo;
+				m_weldedVertices.push_back(newVtx);
+				spatialHash[hashKey].push_back(foundIndex);
+			}
+			m_vertexRemap[originalNo] = foundIndex;
+		}
+		(pMesh->m_lpVB1)->Unlock();
+		(pMesh->m_lpVB2)->Unlock();
+		pMesh = (CMesh*)pMesh->Next;
+	}
+}
 
 bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 {
@@ -53,81 +127,19 @@ bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 	uvElement->SetMappingMode(FbxGeometryElement::eByControlPoint); // 頂点ごとにUVを設定
 	uvElement->SetReferenceMode(FbxGeometryElement::eDirect); // UVを直接指定
 
-	int numVer = totalVertex();
-	m_vertexRemap.assign(numVer, -1);
-	std::vector<UniqueVertex> uniqueVertices;
+	OptimizeVertices();
 
-	// 空間ハッシュテーブル（高速化・キーはグリッド座標）
-	std::unordered_map<long long, std::vector<int>> spatialHash;
-	const float GRID_SIZE = 0.01f;
-	const float THRESHOLD_SQ = 0.0001f * 0.0001f;
+	pfbxMesh->InitControlPoints((int)m_weldedVertices.size());
+	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
+		D3DXVECTOR3 vert = m_weldedVertices[i].p;
+		D3DXVec3TransformCoord(&vert, &vert, &rootMatrix);
 
-	unsigned int originalNo = 0;
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1, * pV2;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++, originalNo++) {
-			D3DXVECTOR3 vert(pV1->p.x, pV1->p.y, pV1->p.z);
-			D3DXVec3TransformCoord(&vert, &vert, &rootMatrix);
+		D3DXVECTOR3 norm = m_weldedVertices[i].n;
+		D3DXVec3TransformNormal(&norm, &norm, &rootMatrix);
 
-			D3DXVECTOR3 norm(pV1->n.x, pV1->n.y, pV1->n.z);
-			D3DXVec3TransformNormal(&norm, &norm, &rootMatrix);
-
-			float u = (pV1->u < 0.0f) ? 0.0f : (pV1->u > 1.0f ? 1.0f : pV1->u);
-			float v = (pV1->v < 0.0f) ? 0.0f : (pV1->v > 1.0f ? 1.0f : pV1->v);
-			
-			float b1_1 = pV1->b1;
-			int global_bone_1 = (b1_1 > 0.0f) ? pMesh->m_pBoneTbl[pV1->indx] : -1;
-			float b1_2 = pV2->b1;
-			int global_bone_2 = (b1_2 > 0.0f) ? pMesh->m_pBoneTbl[pV2->indx] : -1;
-
-			// ハッシュキーの作成
-			long long hx = (long long)std::floor(vert.x / GRID_SIZE);
-			long long hy = (long long)std::floor(vert.y / GRID_SIZE);
-			long long hz = (long long)std::floor(vert.z / GRID_SIZE);
-			long long hashKey = (hx * 73856093LL) ^ (hy * 19349663LL) ^ (hz * 83492791LL);
-
-			int foundIndex = -1;
-			// ハッシュ近傍から距離0.0001以下の頂点を探索 (座標、法線、UV、ボーンウェイト 全て比較)
-			if (spatialHash.count(hashKey)) {
-				for (int idx : spatialHash[hashKey]) {
-					const UniqueVertex& uvtx = uniqueVertices[idx];
-					if (D3DXVec3LengthSq(&(vert - uvtx.pos)) <= THRESHOLD_SQ) {
-						if (D3DXVec3LengthSq(&(norm - uvtx.norm)) <= THRESHOLD_SQ) {
-							if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
-								if (fabs(b1_1 - uvtx.b1_1) <= 0.0001f && fabs(b1_2 - uvtx.b1_2) <= 0.0001f &&
-									global_bone_1 == uvtx.global_bone_1 && global_bone_2 == uvtx.global_bone_2) {
-									foundIndex = idx;
-									break;
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if (foundIndex == -1) {
-				// 新規ならUniqueリストへ追加
-				foundIndex = (int)uniqueVertices.size();
-				uniqueVertices.push_back({ vert, norm, u, v, b1_1, b1_2, global_bone_1, global_bone_2 });
-				spatialHash[hashKey].push_back(foundIndex);
-			}
-			// リマップテーブルに記録
-			m_vertexRemap[originalNo] = foundIndex;
-		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpVB2)->Unlock();
-		pMesh = (CMesh*)pMesh->Next;
-	}
-
-	// 集められた重複排除済み(Unique)な頂点のみFBXに出力する
-	pfbxMesh->InitControlPoints((int)uniqueVertices.size());
-	for (size_t i = 0; i < uniqueVertices.size(); i++) {
-		pfbxMesh->SetControlPointAt(FbxVector4(uniqueVertices[i].pos.x, uniqueVertices[i].pos.y, uniqueVertices[i].pos.z), (int)i);
-		normalElement->GetDirectArray().Add(FbxVector4(uniqueVertices[i].norm.x, uniqueVertices[i].norm.y, uniqueVertices[i].norm.z));
-		uvElement->GetDirectArray().Add(FbxVector2(uniqueVertices[i].u, 1.0 - uniqueVertices[i].v));
+		pfbxMesh->SetControlPointAt(FbxVector4(vert.x, vert.y, vert.z), (int)i);
+		normalElement->GetDirectArray().Add(FbxVector4(norm.x, norm.y, norm.z));
+		uvElement->GetDirectArray().Add(FbxVector2(m_weldedVertices[i].u, 1.0 - m_weldedVertices[i].v));
 	}
 	return true;
 }
@@ -869,6 +881,7 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
+	OptimizeVertices();
 	outputVertex(fd);
 	outputFace(fd);
 	//法線出力
@@ -1126,34 +1139,17 @@ int CModel::totalFace(void) {
 }
 
 bool CModel::outputVertex(FILE* fd) {
-	int numVer = totalVertex();
-	int numFace = totalFace();
+	int numVer = (int)m_weldedVertices.size();
 	//頂点数出力
 	fprintf(fd, " %d;\n", numVer);
 	// 頂点座標出力
 	bool notfirst = false;
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++) {
-			if (notfirst)
-				fprintf(fd, ",\n");
-			else
-				notfirst = true;
-			if (fabs(pV1->p.x) > 10000.0 ||
-				fabs(pV1->p.y) > 10000.0 ||
-				fabs(pV1->p.z) > 10000.0) {
-				pV1->p.x = 0.; pV1->p.y = 0.; pV1->p.z = 0.;
-				pV1->n.x = 0.; pV1->n.y = 0.; pV1->n.z = 0.;
-				pV1->u = 0.; pV1->v = 0.;
-				pV1->b1 = 0.; pV1->indx = 0;
-			}
-			fprintf(fd, "        %6.6f;%6.6f;%6.6f;", pV1->p.x, pV1->p.y, pV1->p.z);
-		}
-		//if (pMesh->Next!=NULL) fprintf(fd, ",\n");
-		(pMesh->m_lpVB1)->Unlock();
-		pMesh = (CMesh*)pMesh->Next;
+	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
+		if (notfirst)
+			fprintf(fd, ",\n");
+		else
+			notfirst = true;
+		fprintf(fd, "        %6.6f;%6.6f;%6.6f;", m_weldedVertices[i].p.x, m_weldedVertices[i].p.y, m_weldedVertices[i].p.z);
 	}
 	fprintf(fd, ";\n");
 	return true;
@@ -1225,7 +1221,7 @@ bool CModel::outputFace(FILE* fd) {
 						fprintf(fd, ",\n");
 					else
 						notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
+					fprintf(fd, "  3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
 				}
 			}
 			fCnt += pStream->GetFaceCount();
@@ -1242,34 +1238,23 @@ bool CModel::outputFace(FILE* fd) {
 }
 
 bool CModel::outputNormal(FILE* fd) {
-	int numVer = totalVertex();
-	int numFace = totalFace();
-
+	int numVer = m_weldedVertices.size();
 	// 法線数出力
 	fprintf(fd, " %d;\n", numVer);
 	// 法線ベクトル出力
 	bool notfirst = false;
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++) {
-			if (notfirst)
-				fprintf(fd, ",\n");
-			else
-				notfirst = true;
-			fprintf(fd, "        %6.6f;%6.6f;%6.6f;", pV1->n.x, pV1->n.y, pV1->n.z);
-		}
-		//if (pMesh->Next != NULL) fprintf(fd, ",\n");
-		(pMesh->m_lpVB1)->Unlock();
-		pMesh = (CMesh*)pMesh->Next;
+	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
+		if (notfirst)
+			fprintf(fd, ",\n");
+		else
+			notfirst = true;
+		fprintf(fd, "        %6.6f;%6.6f;%6.6f;", m_weldedVertices[i].n.x, m_weldedVertices[i].n.y, m_weldedVertices[i].n.z);
 	}
 	fprintf(fd, ";\n");
 	return true;
 }
 
 bool CModel::outputNormalFace(FILE* fd) {
-	int numVer = totalVertex();
 	int numFace = totalFace();
 	// 面数出力
 	fprintf(fd, " %d;\n", numFace);
@@ -1297,43 +1282,21 @@ bool CModel::outputNormalFace(FILE* fd) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
 					if (i % 2) {
-						if (pMesh->m_FlipFlag) {
-							t1 = i3; t2 = i2; t3 = i1;
-						}
-						else {
-							t1 = i1; t2 = i2; t3 = i3;
-						}
+						if (pMesh->m_FlipFlag) { t1 = i3; t2 = i2; t3 = i1; } else { t1 = i1; t2 = i2; t3 = i3; }
+					} else {
+						if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; } else { t1 = i3; t2 = i2; t3 = i1; }
 					}
-					else {
-						if (pMesh->m_FlipFlag) {
-							t1 = i1; t2 = i2; t3 = i3;
-						}
-						else {
-							t1 = i3; t2 = i2; t3 = i1;
-						}
-					}
-					if (notfirst)
-						fprintf(fd, ",\n");
-					else
-						notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
+					if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
+					fprintf(fd, "  3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
 					i1 = i2; i2 = i3;
 				}
 			}
 			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
-					if (pMesh->m_FlipFlag) {
-						t1 = i1; t2 = i2; t3 = i3;
-					}
-					else {
-						t1 = i3; t2 = i2; t3 = i1;
-					}
-					if (notfirst)
-						fprintf(fd, ",\n");
-					else
-						notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
+					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; } else { t1 = i3; t2 = i2; t3 = i1; }
+					if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
+					fprintf(fd, "  3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
 				}
 			}
 			fCnt += pStream->GetFaceCount();
@@ -1341,7 +1304,6 @@ bool CModel::outputNormalFace(FILE* fd) {
 		}
 		(pMesh->m_lpVB1)->Unlock();
 		(pMesh->m_lpIB)->Unlock();
-		//if (pMesh->Next != NULL) fprintf(fd, ",\n");
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
@@ -1350,8 +1312,7 @@ bool CModel::outputNormalFace(FILE* fd) {
 }
 
 bool CModel::outputTexCoord(FILE* fd) {
-	int numVer = totalVertex();
-	int numFace = totalFace();
+	int numVer = m_weldedVertices.size();
 
 	// テクスチャu,v出力
 	fprintf(fd, "   MeshTextureCoords {\n");
@@ -1359,27 +1320,19 @@ bool CModel::outputTexCoord(FILE* fd) {
 	fprintf(fd, " %d;\n", numVer);
 	// テクスチャU,V出力
 	bool notfirst = false;
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++) {
-			if (notfirst)
-				fprintf(fd, ",\n");
-			else
-				notfirst = true;
-			//if (i == 15) {
-			//	int hh = 0;
-			//}
-			if (pV1->u < 0.0) pV1->u = 0.0;
-			if (pV1->v < 0.0) pV1->v = 0.0;
-			if (pV1->u > 1.0) pV1->u = 1.0;
-			if (pV1->v > 1.0) pV1->v = 1.0;
-			fprintf(fd, "        %4.6f;%4.6f;", pV1->u, pV1->v);
-		}
-		//if (pMesh->Next != NULL) fprintf(fd, ",\n");
-		(pMesh->m_lpVB1)->Unlock();
-		pMesh = (CMesh*)pMesh->Next;
+	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
+		if (notfirst)
+			fprintf(fd, ",\n");
+		else
+			notfirst = true;
+		
+		float u = m_weldedVertices[i].u;
+		float v = m_weldedVertices[i].v;
+		if (u < 0.0f) u = 0.0f;
+		if (v < 0.0f) v = 0.0f;
+		if (u > 1.0f) u = 1.0f;
+		if (v > 1.0f) v = 1.0f;
+		fprintf(fd, "        %4.6f;%4.6f;", u, v);
 	}
 	fprintf(fd, ";\n");
 	fprintf(fd, "}\n");
@@ -1387,8 +1340,7 @@ bool CModel::outputTexCoord(FILE* fd) {
 }
 
 bool CModel::outputVerDup(FILE* fd) {
-	int numVer = totalVertex();
-	int numFace = totalFace();
+	int numVer = m_weldedVertices.size();
 	// 頂点重複リスト
 	fprintf(fd, " VertexDuplicationIndices {\n");
 	fprintf(fd, "  %d;\n", numVer);
@@ -1513,100 +1465,52 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 
 int CModel::countBone2Ver(int boneNo) {
 	int	 boneCnt = 0;
-
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1, * pV2;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
-			if (pV1->b1 > 0.f && pMesh->m_pBoneTbl[pV1->indx] == boneNo) {
-				boneCnt++;
-			}
-			else if (pV2->b1 > 0.f && pMesh->m_pBoneTbl[pV2->indx] == boneNo) {
-				boneCnt++;
-			}
+	int numVer = m_weldedVertices.size();
+	for (int i = 0; i < numVer; i++) {
+		const WELDED_VERTEX& vtx = m_weldedVertices[i];
+		if ((vtx.weights[0] > 0.f && vtx.globalBones[0] == boneNo) ||
+			(vtx.weights[1] > 0.f && vtx.globalBones[1] == boneNo)) {
+			boneCnt++;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpVB2)->Unlock();
-		pMesh = (CMesh*)pMesh->Next;
 	}
 	return boneCnt;
 }
 
 bool CModel::outputBone2VerNo(FILE* fd, int boneNo) {
-	int vCnt = 0, fCnt = 0;
 	bool notfirst = false;
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1, * pV2;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
-			if (pV1->b1 > 0.f && pMesh->m_pBoneTbl[pV1->indx] == boneNo) {
-				if (notfirst)
-					fprintf(fd, ",\n");
-				else
-					notfirst = true;
-				fprintf(fd, "  %5d", i + vCnt);
-				//fprintf(fd, "  %5d(X %4.4f Y %4.4f Z %4.4f W %1.6f idx %4d idxG %4d local %4d global %4d)", i + vCnt,
-				//pV1->p.x, pV1->p.y, pV1->p.z, pV1->b1, pV1->indx, pMesh->m_pBoneTbl[pV1->indx], i, i + vCnt);
-			}
-			else if (pV2->b1 > 0.f && pMesh->m_pBoneTbl[pV2->indx] == boneNo) {
-				if (notfirst)
-					fprintf(fd, ",\n");
-				else
-					notfirst = true;
-				fprintf(fd, "  %5d", i + vCnt);
-				//fprintf(fd, "  %5d(X %4.4f Y %4.4f Z %4.4f W %1.6f idx %4d idxG %4d local %4d global %4d)", i + vCnt,
-				//pV1->p.x, pV1->p.y, pV1->p.z, pV2->b1, pV2->indx, pMesh->m_pBoneTbl[pV2->indx], i, i + vCnt);
-			}
+	int numVer = m_weldedVertices.size();
+	for (int i = 0; i < numVer; i++) {
+		const WELDED_VERTEX& vtx = m_weldedVertices[i];
+		if (vtx.weights[0] > 0.f && vtx.globalBones[0] == boneNo) {
+			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
+			fprintf(fd, "  %5d", i);
+		} else if (vtx.weights[1] > 0.f && vtx.globalBones[1] == boneNo) {
+			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
+			fprintf(fd, "  %5d", i);
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpVB2)->Unlock();
-		vCnt += pMesh->m_NumVertices;
-		pMesh = (CMesh*)pMesh->Next;
 	}
 	fprintf(fd, ";\n");
 	return true;
 }
 
 bool CModel::outputBone2VerWeight(FILE* fd, int boneNo) {
-	int vCnt = 0, fCnt = 0;
 	bool notfirst = false;
-	CMesh* pMesh = (CMesh*)m_Meshs.Top();
-	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1, * pV2;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
-			if (pV1->b1 > 0.f && pMesh->m_pBoneTbl[pV1->indx] == boneNo) {
-				if (notfirst)
-					fprintf(fd, ",\n");
-				else
-					notfirst = true;
-				if (pV1->b1 < 0.0) pV1->b1 = 0.0;
-				if (pV1->b1 > 1.0) pV1->b1 = 1.0;
-				fprintf(fd, "  %1.6f", pV1->b1);
-				//fprintf(fd, "  %1.6f(X %4.4f Y %4.4f Z %4.4f W %1.6f idx %4d idxG %4d local %4d global %4d)", pV1->b1,
-				//pV1->p.x, pV1->p.y, pV1->p.z, pV1->b1, pV1->indx, pMesh->m_pBoneTbl[pV1->indx], i, i + vCnt);
-			}
-			else if (pV2->b1 > 0.f && pMesh->m_pBoneTbl[pV2->indx] == boneNo) {
-				if (notfirst)
-					fprintf(fd, ",\n");
-				else
-					notfirst = true;
-				if (pV2->b1 < 0.0) pV2->b1 = 0.0;
-				if (pV2->b1 > 1.0) pV2->b1 = 1.0;
-				fprintf(fd, "  %1.6f", pV2->b1);
-				//fprintf(fd, "  %1.6f(X %4.4f Y %4.4F Z %4.4f W %1.6f idx %4d idxG %4d local %4d global %4d)", pV2->b1,
-				//pV1->p.x, pV1->p.y, pV1->p.z, pV2->b1, pV2->indx, pMesh->m_pBoneTbl[pV2->indx], i, i + vCnt);
-			}
+	int numVer = m_weldedVertices.size();
+	for (int i = 0; i < numVer; i++) {
+		const WELDED_VERTEX& vtx = m_weldedVertices[i];
+		if (vtx.weights[0] > 0.f && vtx.globalBones[0] == boneNo) {
+			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
+			float weight = vtx.weights[0];
+			if (weight < 0.0f) weight = 0.0f;
+			if (weight > 1.0f) weight = 1.0f;
+			fprintf(fd, "  %1.6f", weight);
+		} else if (vtx.weights[1] > 0.f && vtx.globalBones[1] == boneNo) {
+			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
+			float weight = vtx.weights[1];
+			if (weight < 0.0f) weight = 0.0f;
+			if (weight > 1.0f) weight = 1.0f;
+			fprintf(fd, "  %1.6f", weight);
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpVB2)->Unlock();
-		vCnt += pMesh->m_NumVertices;
-		pMesh = (CMesh*)pMesh->Next;
 	}
 	fprintf(fd, ";\n");
 	return true;
