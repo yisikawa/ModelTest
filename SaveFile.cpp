@@ -30,10 +30,17 @@ char* strcpynosp(char* string1, char* string2);//空白を除いて文字列をコピーする
 //		FBXファイルセーブ
 //		データをFBXフォーマットで出力します
 //======================================================================
+struct UniqueVertex {
+	D3DXVECTOR3 pos;
+	D3DXVECTOR3 norm;
+	float u, v;
+	float b1_1, b1_2;
+	int global_bone_1, global_bone_2;
+};
+
 bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 {
 	D3DXMATRIX rootMatrix, mat;
-	D3DXVECTOR3 vert;
 
 	D3DXMatrixRotationY(&mat, (float)(PAI / 2.));
 	D3DXMatrixRotationX(&rootMatrix, (float)PAI);
@@ -46,35 +53,81 @@ bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 	uvElement->SetMappingMode(FbxGeometryElement::eByControlPoint); // 頂点ごとにUVを設定
 	uvElement->SetReferenceMode(FbxGeometryElement::eDirect); // UVを直接指定
 
-	int numVer = totalVertex();	//頂点数出力
-	pfbxMesh->InitControlPoints(numVer);
-	// 頂点座標出力
-	unsigned int no = 0;
+	int numVer = totalVertex();
+	m_vertexRemap.assign(numVer, -1);
+	std::vector<UniqueVertex> uniqueVertices;
+
+	// 空間ハッシュテーブル（高速化・キーはグリッド座標）
+	std::unordered_map<long long, std::vector<int>> spatialHash;
+	const float GRID_SIZE = 0.01f;
+	const float THRESHOLD_SQ = 0.0001f * 0.0001f;
+
+	unsigned int originalNo = 0;
 	CMesh* pMesh = (CMesh*)m_Meshs.Top();
 	while (pMesh != NULL) {
-		CUSTOMVERTEX* pV1;
+		CUSTOMVERTEX* pV1, * pV2;
 		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++) {
-			// if (fabs(pV1->p.x) > 10000.0 || fabs(pV1->p.y) > 10000.0 || fabs(pV1->p.z) > 10000.0) {
-// 				pV1->p.x = pV1->p.y = pV1->p.z = pV1->n.x = pV1->n.y = pV1->n.z = 0.;
-// 				pV1->u = pV1->v = pV1->b1 = 0.; pV1->indx = 0;
-			//}
-			vert.x = pV1->p.x; vert.y = pV1->p.y; vert.z = pV1->p.z;
+		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
+		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++, originalNo++) {
+			D3DXVECTOR3 vert(pV1->p.x, pV1->p.y, pV1->p.z);
 			D3DXVec3TransformCoord(&vert, &vert, &rootMatrix);
-			pfbxMesh->SetControlPointAt(FbxVector4(vert.x, vert.y, vert.z), no); no++;
-			//pfbxMesh->SetControlPointAt(FbxVector4(pV1->p.x, pV1->p.y, pV1->p.z), no); no++;
-			vert.x = pV1->n.x; vert.y = pV1->n.y; vert.z = pV1->n.z;
-			D3DXVec3TransformNormal(&vert, &vert, &rootMatrix);
-			//normalElement->GetDirectArray().Add(FbxVector4(pV1->n.x, pV1->n.y, pV1->n.z));
-			normalElement->GetDirectArray().Add(FbxVector4(vert.x, vert.y, vert.z));
-			(pV1->u < 0.0) ? pV1->u = 0.: pV1->u = pV1->u;
-			(pV1->u > 1.0) ? pV1->u = 1.: pV1->u = pV1->u;
-			(pV1->v < 0.0) ? pV1->v = 0.: pV1->v = pV1->v;
-			(pV1->v > 1.0) ? pV1->v = 1.: pV1->v = pV1->v;
-			uvElement->GetDirectArray().Add(FbxVector2(pV1->u, (1.-pV1->v)));
+
+			D3DXVECTOR3 norm(pV1->n.x, pV1->n.y, pV1->n.z);
+			D3DXVec3TransformNormal(&norm, &norm, &rootMatrix);
+
+			float u = (pV1->u < 0.0f) ? 0.0f : (pV1->u > 1.0f ? 1.0f : pV1->u);
+			float v = (pV1->v < 0.0f) ? 0.0f : (pV1->v > 1.0f ? 1.0f : pV1->v);
+			
+			float b1_1 = pV1->b1;
+			int global_bone_1 = (b1_1 > 0.0f) ? pMesh->m_pBoneTbl[pV1->indx] : -1;
+			float b1_2 = pV2->b1;
+			int global_bone_2 = (b1_2 > 0.0f) ? pMesh->m_pBoneTbl[pV2->indx] : -1;
+
+			// ハッシュキーの作成
+			long long hx = (long long)std::floor(vert.x / GRID_SIZE);
+			long long hy = (long long)std::floor(vert.y / GRID_SIZE);
+			long long hz = (long long)std::floor(vert.z / GRID_SIZE);
+			long long hashKey = (hx * 73856093LL) ^ (hy * 19349663LL) ^ (hz * 83492791LL);
+
+			int foundIndex = -1;
+			// ハッシュ近傍から距離0.0001以下の頂点を探索 (座標、法線、UV、ボーンウェイト 全て比較)
+			if (spatialHash.count(hashKey)) {
+				for (int idx : spatialHash[hashKey]) {
+					const UniqueVertex& uvtx = uniqueVertices[idx];
+					if (D3DXVec3LengthSq(&(vert - uvtx.pos)) <= THRESHOLD_SQ) {
+						if (D3DXVec3LengthSq(&(norm - uvtx.norm)) <= THRESHOLD_SQ) {
+							if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
+								if (fabs(b1_1 - uvtx.b1_1) <= 0.0001f && fabs(b1_2 - uvtx.b1_2) <= 0.0001f &&
+									global_bone_1 == uvtx.global_bone_1 && global_bone_2 == uvtx.global_bone_2) {
+									foundIndex = idx;
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (foundIndex == -1) {
+				// 新規ならUniqueリストへ追加
+				foundIndex = (int)uniqueVertices.size();
+				uniqueVertices.push_back({ vert, norm, u, v, b1_1, b1_2, global_bone_1, global_bone_2 });
+				spatialHash[hashKey].push_back(foundIndex);
+			}
+			// リマップテーブルに記録
+			m_vertexRemap[originalNo] = foundIndex;
 		}
 		(pMesh->m_lpVB1)->Unlock();
+		(pMesh->m_lpVB2)->Unlock();
 		pMesh = (CMesh*)pMesh->Next;
+	}
+
+	// 集められた重複排除済み(Unique)な頂点のみFBXに出力する
+	pfbxMesh->InitControlPoints((int)uniqueVertices.size());
+	for (size_t i = 0; i < uniqueVertices.size(); i++) {
+		pfbxMesh->SetControlPointAt(FbxVector4(uniqueVertices[i].pos.x, uniqueVertices[i].pos.y, uniqueVertices[i].pos.z), (int)i);
+		normalElement->GetDirectArray().Add(FbxVector4(uniqueVertices[i].norm.x, uniqueVertices[i].norm.y, uniqueVertices[i].norm.z));
+		uvElement->GetDirectArray().Add(FbxVector2(uniqueVertices[i].u, 1.0 - uniqueVertices[i].v));
 	}
 	return true;
 }
@@ -122,9 +175,9 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 						}
 					}
 					pfbxMesh->BeginPolygon();
-					pfbxMesh->AddPolygon(t1 + vCnt);
-					pfbxMesh->AddPolygon(t2 + vCnt);
-					pfbxMesh->AddPolygon(t3 + vCnt);
+					pfbxMesh->AddPolygon(m_vertexRemap[t1 + vCnt]);
+					pfbxMesh->AddPolygon(m_vertexRemap[t2 + vCnt]);
+					pfbxMesh->AddPolygon(m_vertexRemap[t3 + vCnt]);
 					pfbxMesh->EndPolygon();
 					pMaterialElement->GetIndexArray().Add(pStream->m_texNo); // materials[texNo] を割り当てる
 					//fprintf(fd, "  3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
@@ -141,9 +194,9 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 						t1 = i3; t2 = i2; t3 = i1;
 					}
 					pfbxMesh->BeginPolygon();
-					pfbxMesh->AddPolygon(t1 + vCnt);
-					pfbxMesh->AddPolygon(t2 + vCnt);
-					pfbxMesh->AddPolygon(t3 + vCnt);
+					pfbxMesh->AddPolygon(m_vertexRemap[t1 + vCnt]);
+					pfbxMesh->AddPolygon(m_vertexRemap[t2 + vCnt]);
+					pfbxMesh->AddPolygon(m_vertexRemap[t3 + vCnt]);
 					pfbxMesh->EndPolygon();
 					pMaterialElement->GetIndexArray().Add(pStream->m_texNo); // materials[texNo] を割り当てる
 					// fprintf(fd, "  3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
@@ -293,20 +346,26 @@ bool CModel::SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo) {
 	int indNum = 0;
 	int vCnt = 0;
 	CMesh* pMesh = (CMesh*)m_Meshs.Top();
+	std::vector<bool> addedMap(m_vertexRemap.size(), false);
 	while (pMesh != NULL) {
 		CUSTOMVERTEX* pV1, * pV2;
 		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
 		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
+			int uniqueInd = m_vertexRemap[i + vCnt];
+			if (addedMap[uniqueInd]) continue;
+
 			if (pV1->b1 > 0.f && pMesh->m_pBoneTbl[pV1->indx] == boneNo) {
 				(pV1->b1 < 0.0) ? pV1->b1 = 0.: pV1->b1 = pV1->b1;
 				(pV1->b1 > 1.0) ? pV1->b1 = 1.: pV1->b1 = pV1->b1;
-				pCBCluster->AddControlPointIndex(i + vCnt, pV1->b1);
+				pCBCluster->AddControlPointIndex(uniqueInd, pV1->b1);
+				addedMap[uniqueInd] = true;
 			}
 			else if (pV2->b1 > 0.f && pMesh->m_pBoneTbl[pV2->indx] == boneNo) {
 				(pV2->b1 < 0.0) ? pV2->b1 = 0. : pV2->b1 = pV2->b1;
 				(pV2->b1 > 1.0) ? pV2->b1 = 1. : pV2->b1 = pV2->b1;
-				pCBCluster->AddControlPointIndex(i + vCnt, pV2->b1);
+				pCBCluster->AddControlPointIndex(uniqueInd, pV2->b1);
+				addedMap[uniqueInd] = true;
 			}
 		}
 		(pMesh->m_lpVB1)->Unlock();
