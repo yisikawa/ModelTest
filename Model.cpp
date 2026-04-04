@@ -1022,7 +1022,8 @@ void CMesh::SetMeshBone( int Num1, int Num2, WORD Type, WORD BoneTblNum, WORD *p
 //		メッシュ読み込み
 //======================================================================
 
-HRESULT CMesh::LoadMesh( char *pFile, CModel *pModel, unsigned long FVF,int Flip  )
+HRESULT CMesh::
+( char *pFile, CModel *pModel, unsigned long FVF,int Flip  )
 {
 	HRESULT hr						= D3D_OK; 
 
@@ -1295,7 +1296,7 @@ HRESULT CMesh::LoadMesh( char *pFile, CModel *pModel, unsigned long FVF,int Flip
 		} else if( 0x8000 == (FaceType&0x80F0) ){
 			//===========================================
 			// テクスチャ名称の設定
-			strncpy(TexName,pPoly+addpos+2,16);
+			strncpy(TexName, pPoly + addpos + 2, 16); TexName[16] = '\0';
 			texNo=0;
 			pMaterial = (CMaterial*)pModel->m_Materials.Top();
 			while ( pMaterial ) {
@@ -3337,7 +3338,7 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 	  WORD		Flip;				//0x04 0==OFF  ON
 	} DAT2AH ;
 #pragma pack(pop)
-
+	char	path[512];
 	DAT2AH	*pHeader;
 	HRESULT hr							= S_OK;
 
@@ -3347,7 +3348,9 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 	char *pdat=NULL;
 	int dwSize;
 	unsigned long	cnt;
-	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
+	strcpy(path, FileName);
+	convert_tex_path(path);
+	HANDLE hFile = CreateFile(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
 	    pdat = new char[dwSize]();
