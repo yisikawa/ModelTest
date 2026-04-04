@@ -1022,7 +1022,7 @@ void CMesh::SetMeshBone( int Num1, int Num2, WORD Type, WORD BoneTblNum, WORD *p
 //		ÉÅÉbÉVÉÖì«Ç›çûÇ›
 //======================================================================
 
-HRESULT CMesh::
+HRESULT CMesh::LoadMesh
 ( char *pFile, CModel *pModel, unsigned long FVF,int Flip  )
 {
 	HRESULT hr						= D3D_OK; 
