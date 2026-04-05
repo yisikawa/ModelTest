@@ -736,6 +736,14 @@ bool CModel::saveFBX(char* FPath, char* FName)
 //		Xファイルセーブ
 //		データをDirectXフォーマットで出力します
 //======================================================================
+void PrintTab(FILE* fd, int indentLevel) {
+	for (int i = 0; i < indentLevel; ++i) {
+		fprintf(fd, "\t");
+	}
+}
+
+int XTab = 0;
+
 bool CModel::saveX(char* FPath, char* FName)
 {
 	FILE* fd;
@@ -748,6 +756,7 @@ bool CModel::saveX(char* FPath, char* FName)
 	rootMatrix *= mat;
 	D3DXMatrixIdentity(&lmatrix);
 	//D3DXMatrixIdentity(&rootMatrix);
+	XTab = 0; // タブ変数の初期化
 
 	if ((ptr = strstr(FPath, ".x"))) *ptr = '\0';
 	if ((ptr = strstr(FName, ".x"))) *ptr = '\0';
@@ -761,21 +770,21 @@ bool CModel::saveX(char* FPath, char* FName)
 	if ((fd = fopen(path, "w")) == NULL) return false;
 	fprintf(fd, "xof 0303txt 0032\n\n");
 	fprintf(fd, "AnimTickPerSecond {\n\t\t3000;\n\t}\n");
-	fprintf(fd, " Frame Scene_Root {\n");
+	PrintTab(fd, XTab); fprintf(fd, "Frame Scene_Root {\n"); XTab++;
 	outputMatrix(fd, &rootMatrix);
-	fprintf(fd, " Frame body {\n");
+	PrintTab(fd, XTab); fprintf(fd, "Frame body {\n"); XTab++;
 	outputMatrix(fd, &lmatrix);
 #if 0
 	outputMultiMeshX(FPath, FName, fd); // スキンマルチメッシュ　部品交換用
 #else
-	fprintf(fd, " Mesh {\n"); // スキンワンメッシュ用
+	PrintTab(fd, XTab); fprintf(fd, "Mesh {\n");  XTab++;// スキンワンメッシュ用
 	outputMeshX(FPath, FName, fd);// スキンワンメッシュ用 
 	outputSkinX(fd);// スキンワンメッシュ用
-	fprintf(fd, "}\n");// スキンワンメッシュ用
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");// スキンワンメッシュ用
 #endif
-	fprintf(fd, "}\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	outputFrameX(fd);
-	fprintf(fd, "}\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	std::vector<std::string> strlist;
 	strlist.clear();
 	//outputAnimationSet(fd, m_MotionName);
@@ -847,16 +856,16 @@ bool CModel::outputConvMatrix(FILE* fd, D3DXMATRIX* iMatrix) {
 bool CModel::outputMatrix(FILE* fd, D3DXMATRIX* iMatrix) {
 
 	if (fd == NULL || iMatrix == NULL) return false;
-	fprintf(fd, " FrameTransformMatrix {\n");
+	PrintTab(fd, XTab); fprintf(fd, "FrameTransformMatrix {\n"); XTab++;
 	outputMatrixSub(fd, iMatrix);
-	fprintf(fd, " }\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, " }\n");
 	return true;
 }
 
 bool CModel::outputMatrixSub(FILE* fd, D3DXMATRIX* iMatrix) {
 
 	if (fd == NULL || iMatrix == NULL) return false;
-	fprintf(fd, "  %6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f;;\n"
+	PrintTab(fd, XTab); fprintf(fd, "%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f;;\n"
 		, iMatrix->_11, iMatrix->_12, iMatrix->_13, iMatrix->_14, iMatrix->_21, iMatrix->_22, iMatrix->_23, iMatrix->_24,
 		iMatrix->_31, iMatrix->_32, iMatrix->_33, iMatrix->_34, iMatrix->_41, iMatrix->_42, iMatrix->_43, iMatrix->_44);
 	return true;
@@ -885,10 +894,10 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 	outputVertex(fd);
 	outputFace(fd);
 	//法線出力
-	fprintf(fd, "   MeshNormals {\n");
+	PrintTab(fd, XTab); fprintf(fd, "MeshNormals {\n"); XTab++;
 	outputNormal(fd);
 	outputNormalFace(fd);
-	fprintf(fd, "}\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	outputTexCoord(fd);
 	outputVerDup(fd);
 	outputMaterialList(FPath, FName, fd);
@@ -975,28 +984,28 @@ bool CModel::outputMultiMeshX(char* FPath, char* FName, FILE* fd) {
 
 bool CModel::outputSkinX(FILE* fd) {
 	if (fd == NULL) return false;
-	fprintf(fd, "   XSkinMeshHeader {\n");
-	fprintf(fd, "         2;\n");
-	fprintf(fd, "         2;\n");
+	PrintTab(fd, XTab); fprintf(fd, "XSkinMeshHeader {\n"); XTab++;
+	PrintTab(fd, XTab); fprintf(fd, "2;\n");
+	PrintTab(fd, XTab); fprintf(fd, "2;\n");
 	int cntSkinWeights = 0;
 	for (int i = 0; i < m_nBone; i++) {
 		int	 boneCnt = countBone2Ver(i);
 		if (boneCnt > 0) cntSkinWeights++;
 	}
-	fprintf(fd, "         %d;\n", cntSkinWeights);
-	fprintf(fd, "  }\n");
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", cntSkinWeights);
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	D3DXMATRIX iMatrix;
 	D3DXMatrixIdentity(&iMatrix);
 	for (int i = 0; i < m_nBone; i++) {
 		int	 boneCnt = countBone2Ver(i);
 		if (boneCnt <= 0) continue;
-		fprintf(fd, " SkinWeights {\n");
-		fprintf(fd, " \"Bone%03d\";\n", i);
-		fprintf(fd, "   %d;\n", boneCnt);
+		PrintTab(fd, XTab); fprintf(fd, "SkinWeights {\n"); XTab++;
+		PrintTab(fd, XTab); fprintf(fd, "\"Bone%03d\";\n", i); XTab++;
+		PrintTab(fd, XTab); fprintf(fd, "%d;\n", boneCnt); XTab++;
 		outputSkinWeights(fd, i);
 		iMatrix = m_Bones[i].m_mInvTrans;
 		outputMatrixSub(fd, &iMatrix);
-		fprintf(fd, " }\n");
+		XTab -= 3; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	}
 	return true;
 }
@@ -1012,12 +1021,12 @@ bool CModel::outputFrameX(FILE* fd) {
 	D3DXMATRIX iMatrix;
 	int cnt = 0;
 	if (fd == NULL) return false;
-	fprintf(fd, "  Frame Bone000 {\n");
+	PrintTab(fd, XTab); fprintf(fd, "Frame Bone000 {\n"); XTab++;
 	iMatrix = m_Bones[0].m_mTransform;
 	//iMatrix = m_mRootTransform;
 	outputMatrix(fd, &iMatrix);
 	cnt = outputFrameXsub(fd, 0);
-	fprintf(fd, " }\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
@@ -1031,11 +1040,11 @@ int CModel::outputFrameXsub(FILE* fd, int boneNo) {
 			m_Bones[i].m_mParent == boneNo) {
 			//int	 boneCnt = countBone2Ver(i);
 			//if (boneCnt > 0) {
-			fprintf(fd, " Frame Bone%03d {\n", i);
+			PrintTab(fd, XTab); fprintf(fd, "Frame Bone%03d {\n", i); XTab++;
 			iMatrix = m_Bones[i].m_mTransform;
 			outputMatrix(fd, &iMatrix);
 			outputFrameXsub(fd, i);
-			fprintf(fd, " }\n");
+			--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 			//}
 			//else {
 			//	outputFrameXsub(fd, i);
@@ -1051,11 +1060,11 @@ int CModel::outputFrameXsub(FILE* fd, int boneNo) {
 
 bool CModel::outputAnimationSet(FILE* fd, char* nameMotion) {
 	if (fd == NULL) return false;
-	fprintf(fd, "  AnimationSet %s {\n", nameMotion);
+	PrintTab(fd, XTab); fprintf(fd, "AnimationSet %s {\n", nameMotion); XTab++;
 	for (int i = 0; i < m_nBone; i++) {
 		outputAnimationX(fd, i);
 	}
-	fprintf(fd, "}\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
@@ -1070,11 +1079,11 @@ bool CModel::outputAnimationX(FILE* fd, int boneNo) {
 		tboneNo = 0;
 		tkeyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
 	}
-	fprintf(fd, " Animation {\n");
-	fprintf(fd, "   { Bone%03d }\n", boneNo);
-	fprintf(fd, " AnimationKey {\n");
-	fprintf(fd, " 4;\n");
-	fprintf(fd, " %d;\n", tkeyNum);
+	PrintTab(fd, XTab); fprintf(fd, "Animation {\n"); XTab++;
+	PrintTab(fd, XTab); fprintf(fd, "{ Bone%03d }\n", boneNo);XTab++;
+	PrintTab(fd, XTab); fprintf(fd, "AnimationKey {\n"); XTab++;
+	PrintTab(fd, XTab); fprintf(fd, "4;\n");
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", tkeyNum); XTab++;
 	bool notfirst = false;
 	for (int i = 0; i < tkeyNum; i++) {
 		float fTime = (float)m_MotionArray[tboneNo].m_pRotationKeys[i].Time;
@@ -1089,13 +1098,14 @@ bool CModel::outputAnimationX(FILE* fd, int boneNo) {
 			fprintf(fd, ",\n");
 		else
 			notfirst = true;
+		PrintTab(fd, XTab);
 		fprintf(fd, " %d;16; %6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f,%6.6f;;",
 			(int)(fTime * 0.01), iMatrix._11, iMatrix._12, iMatrix._13, iMatrix._14, iMatrix._21, iMatrix._22, iMatrix._23, iMatrix._24,
 			iMatrix._31, iMatrix._32, iMatrix._33, iMatrix._34, iMatrix._41, iMatrix._42, iMatrix._43, iMatrix._44);
 	}
 	fprintf(fd, ";\n");
-	fprintf(fd, "}\n");
-	fprintf(fd, "}\n");
+	XTab -= 2; PrintTab(fd, XTab); fprintf(fd, "}\n");
+	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
@@ -1141,7 +1151,7 @@ int CModel::totalFace(void) {
 bool CModel::outputVertex(FILE* fd) {
 	int numVer = (int)m_weldedVertices.size();
 	//頂点数出力
-	fprintf(fd, " %d;\n", numVer);
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", numVer); XTab++;
 	// 頂点座標出力
 	bool notfirst = false;
 	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
@@ -1149,9 +1159,9 @@ bool CModel::outputVertex(FILE* fd) {
 			fprintf(fd, ",\n");
 		else
 			notfirst = true;
-		fprintf(fd, "        %6.6f;%6.6f;%6.6f;", m_weldedVertices[i].p.x, m_weldedVertices[i].p.y, m_weldedVertices[i].p.z);
+		PrintTab(fd, XTab); fprintf(fd, "%6.6f;%6.6f;%6.6f;", m_weldedVertices[i].p.x, m_weldedVertices[i].p.y, m_weldedVertices[i].p.z);
 	}
-	fprintf(fd, ";\n");
+	fprintf(fd, ";\n");--XTab;
 	return true;
 }
 
@@ -1160,7 +1170,7 @@ bool CModel::outputFace(FILE* fd) {
 	int numVer = totalVertex();
 	int numFace = totalFace();
 	// 面数出力
-	fprintf(fd, " %d;\n", numFace);
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", numFace); XTab++;
 	// パッチ出力
 	int vCnt = 0, fCnt = 0;
 	bool notfirst = false;
@@ -1204,7 +1214,7 @@ bool CModel::outputFace(FILE* fd) {
 						fprintf(fd, ",\n");
 					else
 						notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
+					PrintTab(fd, XTab); fprintf(fd, "3;%d,%d,%d;", t1 + vCnt, t2 + vCnt, t3 + vCnt);
 					i1 = i2; i2 = i3;
 				}
 			}
@@ -1221,7 +1231,7 @@ bool CModel::outputFace(FILE* fd) {
 						fprintf(fd, ",\n");
 					else
 						notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
+					PrintTab(fd, XTab); fprintf(fd, "3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
 				}
 			}
 			fCnt += pStream->GetFaceCount();
@@ -1233,14 +1243,14 @@ bool CModel::outputFace(FILE* fd) {
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
-	fprintf(fd, ";\n");
+	fprintf(fd, ";\n"); --XTab;
 	return true;
 }
 
 bool CModel::outputNormal(FILE* fd) {
 	int numVer = m_weldedVertices.size();
 	// 法線数出力
-	fprintf(fd, " %d;\n", numVer);
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", numVer); XTab++;
 	// 法線ベクトル出力
 	bool notfirst = false;
 	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
@@ -1248,16 +1258,16 @@ bool CModel::outputNormal(FILE* fd) {
 			fprintf(fd, ",\n");
 		else
 			notfirst = true;
-		fprintf(fd, "        %6.6f;%6.6f;%6.6f;", m_weldedVertices[i].n.x, m_weldedVertices[i].n.y, m_weldedVertices[i].n.z);
+		PrintTab(fd, XTab); fprintf(fd, "%6.6f;%6.6f;%6.6f;", m_weldedVertices[i].n.x, m_weldedVertices[i].n.y, m_weldedVertices[i].n.z);
 	}
-	fprintf(fd, ";\n");
+	fprintf(fd, ";\n"); --XTab;
 	return true;
 }
 
 bool CModel::outputNormalFace(FILE* fd) {
 	int numFace = totalFace();
 	// 面数出力
-	fprintf(fd, " %d;\n", numFace);
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", numFace); XTab++;
 	// パッチ出力
 	int vCnt = 0, fCnt = 0;
 	bool notfirst = false;
@@ -1287,7 +1297,7 @@ bool CModel::outputNormalFace(FILE* fd) {
 						if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; } else { t1 = i3; t2 = i2; t3 = i1; }
 					}
 					if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
+					PrintTab(fd, XTab); fprintf(fd, "3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
 					i1 = i2; i2 = i3;
 				}
 			}
@@ -1296,7 +1306,7 @@ bool CModel::outputNormalFace(FILE* fd) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; } else { t1 = i3; t2 = i2; t3 = i1; }
 					if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
-					fprintf(fd, "  3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
+					PrintTab(fd, XTab); fprintf(fd, "3;%d,%d,%d;", m_vertexRemap[t1 + vCnt], m_vertexRemap[t2 + vCnt], m_vertexRemap[t3 + vCnt]);
 				}
 			}
 			fCnt += pStream->GetFaceCount();
@@ -1307,7 +1317,7 @@ bool CModel::outputNormalFace(FILE* fd) {
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
-	fprintf(fd, ";\n");
+	fprintf(fd, ";\n"); --XTab;
 	return true;
 }
 
@@ -1315,9 +1325,9 @@ bool CModel::outputTexCoord(FILE* fd) {
 	int numVer = m_weldedVertices.size();
 
 	// テクスチャu,v出力
-	fprintf(fd, "   MeshTextureCoords {\n");
+	PrintTab(fd, XTab); fprintf(fd, "MeshTextureCoords {\n"); XTab++;
 	// uv数出力
-	fprintf(fd, " %d;\n", numVer);
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", numVer); XTab++;
 	// テクスチャU,V出力
 	bool notfirst = false;
 	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
@@ -1332,25 +1342,25 @@ bool CModel::outputTexCoord(FILE* fd) {
 		if (v < 0.0f) v = 0.0f;
 		if (u > 1.0f) u = 1.0f;
 		if (v > 1.0f) v = 1.0f;
-		fprintf(fd, "        %4.6f;%4.6f;", u, v);
+		PrintTab(fd, XTab); fprintf(fd, "%4.6f;%4.6f;", u, v);
 	}
 	fprintf(fd, ";\n");
-	fprintf(fd, "}\n");
+	XTab -= 2; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
 bool CModel::outputVerDup(FILE* fd) {
 	int numVer = m_weldedVertices.size();
 	// 頂点重複リスト
-	fprintf(fd, " VertexDuplicationIndices {\n");
-	fprintf(fd, "  %d;\n", numVer);
-	fprintf(fd, "  %d;\n", numVer);
+	PrintTab(fd, XTab); fprintf(fd, " VertexDuplicationIndices {\n"); XTab++;
+	PrintTab(fd, XTab); fprintf(fd, " %d;\n", numVer);
+	PrintTab(fd, XTab); fprintf(fd, " %d;\n", numVer); XTab++;
 	for (int i = 0; i < numVer; i++) {
 		if (i > 0) fprintf(fd, ",\n");
-		fprintf(fd, " %d", i);
+		PrintTab(fd, XTab); fprintf(fd, "%d", i);
 	}
 	fprintf(fd, ";\n");
-	fprintf(fd, "}\n");
+	XTab -= 2; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
@@ -1358,11 +1368,11 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 	int numFace = totalFace();
 	int vCnt = 0, fCnt = 0;
 	// meshマテリアルリスト出力
-	fprintf(fd, "  MeshMaterialList {\n");
+	PrintTab(fd, XTab); fprintf(fd, "MeshMaterialList {\n"); XTab++;
 	// マテリアル数出力
-	fprintf(fd, "%d;\n", m_Materials.Count);
+	PrintTab(fd, XTab); fprintf(fd, "%d;\n", m_Materials.Count); XTab++;
 	// 面数出力
-	fprintf(fd, " %d;\n", numFace);
+	PrintTab(fd, XTab); fprintf(fd, " %d;\n", numFace); XTab++;
 	// マテリアル番号出力
 	bool notfirst = false;
 	CMesh* pMesh = (CMesh*)m_Meshs.Top();
@@ -1405,7 +1415,7 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 						fprintf(fd, ",\n");
 					else
 						notfirst = true;
-					fprintf(fd, "  %d", pStream->m_texNo);
+					PrintTab(fd, XTab); fprintf(fd, "%d", pStream->m_texNo);
 					i1 = i2; i2 = i3;
 				}
 			}
@@ -1422,7 +1432,7 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 						fprintf(fd, ",\n");
 					else
 						notfirst = true;
-					fprintf(fd, "  %d", pStream->m_texNo);
+					PrintTab(fd, XTab); fprintf(fd, "%d", pStream->m_texNo);
 				}
 			}
 			fCnt += pStream->GetFaceCount();
@@ -1435,7 +1445,7 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 	}
 	fprintf(fd, ";\n");
 	outputMaterial(FPath, FName, fd);
-	fprintf(fd, "}\n");
+	XTab -= 3; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
@@ -1445,17 +1455,17 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
 	while (pMaterial != NULL)
 	{
-		fprintf(fd, " Material {\n");
-		fprintf(fd, " 1.000;1.000;1.000;1.000;;\n");
-		fprintf(fd, " 0.000;\n");
-		fprintf(fd, " 1.000;1.000;1.000;;\n");
-		fprintf(fd, " 0.000;0.000;0.000;;\n");
-		fprintf(fd, " TextureFilename {\n");
+		PrintTab(fd, XTab); fprintf(fd, "Material {\n"); XTab++;
+		PrintTab(fd, XTab); fprintf(fd, "1.000;1.000;1.000;1.000;;\n");
+		PrintTab(fd, XTab); fprintf(fd, "0.000;\n");
+		PrintTab(fd, XTab); fprintf(fd, "1.000;1.000;1.000;;\n");
+		PrintTab(fd, XTab); fprintf(fd, "0.000;0.000;0.000;;\n");
+		PrintTab(fd, XTab); fprintf(fd, "TextureFilename {\n"); XTab++;
 		//		fprintf(fd, " \"%s%02d.bmp\";\n", FName, count);
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		fprintf(fd, " \"%s.bmp\";\n", texName);
-		fprintf(fd, "}\n");
-		fprintf(fd, "}\n");
+		PrintTab(fd, XTab); fprintf(fd, "\"%s.bmp\";\n", texName);
+		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
+		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 		//sprintf(texpath, "%s%02d.bmp", FPath, count);
 		//D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
@@ -1483,10 +1493,10 @@ bool CModel::outputBone2VerNo(FILE* fd, int boneNo) {
 		const WELDED_VERTEX& vtx = m_weldedVertices[i];
 		if (vtx.weights[0] > 0.f && vtx.globalBones[0] == boneNo) {
 			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
-			fprintf(fd, "  %5d", i);
+			PrintTab(fd, XTab); fprintf(fd, "%5d", i);
 		} else if (vtx.weights[1] > 0.f && vtx.globalBones[1] == boneNo) {
 			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
-			fprintf(fd, "  %5d", i);
+			PrintTab(fd, XTab); fprintf(fd, "%5d", i);
 		}
 	}
 	fprintf(fd, ";\n");
@@ -1503,13 +1513,13 @@ bool CModel::outputBone2VerWeight(FILE* fd, int boneNo) {
 			float weight = vtx.weights[0];
 			if (weight < 0.0f) weight = 0.0f;
 			if (weight > 1.0f) weight = 1.0f;
-			fprintf(fd, "  %1.6f", weight);
+			PrintTab(fd, XTab); fprintf(fd, "%1.6f", weight);
 		} else if (vtx.weights[1] > 0.f && vtx.globalBones[1] == boneNo) {
 			if (notfirst) fprintf(fd, ",\n"); else notfirst = true;
 			float weight = vtx.weights[1];
 			if (weight < 0.0f) weight = 0.0f;
 			if (weight > 1.0f) weight = 1.0f;
-			fprintf(fd, "  %1.6f", weight);
+			PrintTab(fd, XTab); fprintf(fd, "%1.6f", weight);
 		}
 	}
 	fprintf(fd, ";\n");
