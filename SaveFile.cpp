@@ -42,6 +42,7 @@ void CModel::OptimizeVertices(void) {
 	const float GRID_SIZE = 0.01f;
 	const float THRESHOLD_SQ = 0.0001f * 0.0001f;
 
+	// === Phase 1: 頂点の結合（法線はゼロで初期化） ===
 	unsigned int originalNo = 0;
 	CMesh* pMesh = (CMesh*)m_Meshs.Top();
 	while (pMesh != NULL) {
@@ -50,17 +51,15 @@ void CModel::OptimizeVertices(void) {
 		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++, originalNo++) {
 			D3DXVECTOR3 vert(pV1->p.x, pV1->p.y, pV1->p.z);
-			D3DXVECTOR3 norm(pV1->n.x, pV1->n.y, pV1->n.z);
 
 			if (fabs(vert.x) > 10000.0 || fabs(vert.y) > 10000.0 || fabs(vert.z) > 10000.0) {
 				vert.x = 0; vert.y = 0; vert.z = 0;
-				norm.x = 0; norm.y = 0; norm.z = 0;
 				pV1->u = 0; pV1->v = 0;
 			}
 
 			float u = (pV1->u < 0.0f) ? 0.0f : (pV1->u > 1.0f ? 1.0f : pV1->u);
 			float v = (pV1->v < 0.0f) ? 0.0f : (pV1->v > 1.0f ? 1.0f : pV1->v);
-			
+
 			float b1_1 = pV1->b1;
 			int global_bone_1 = (b1_1 > 0.0f) ? pMesh->m_pBoneTbl[pV1->indx] : -1;
 			float b1_2 = pV2->b1;
@@ -69,19 +68,25 @@ void CModel::OptimizeVertices(void) {
 			long long hx = (long long)std::floor(vert.x / GRID_SIZE);
 			long long hy = (long long)std::floor(vert.y / GRID_SIZE);
 			long long hz = (long long)std::floor(vert.z / GRID_SIZE);
-			long long hashKey = (hx * 73856093LL) ^ (hy * 19349663LL) ^ (hz * 83492791LL);
 
 			int foundIndex = -1;
-			if (spatialHash.count(hashKey)) {
-				for (int idx : spatialHash[hashKey]) {
-					const WELDED_VERTEX& uvtx = m_weldedVertices[idx];
-					if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
-						if (D3DXVec3LengthSq(&(norm - uvtx.n)) <= THRESHOLD_SQ) {
-							if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
-								if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
-									global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
-									foundIndex = idx;
-									break;
+			// 隣接セルも検索して境界付近の頂点の結合漏れを防止
+			for (long long dx = -1; dx <= 1 && foundIndex == -1; dx++) {
+				for (long long dy = -1; dy <= 1 && foundIndex == -1; dy++) {
+					for (long long dz = -1; dz <= 1 && foundIndex == -1; dz++) {
+						long long hashKey = ((hx + dx) * 73856093LL) ^ ((hy + dy) * 19349663LL) ^ ((hz + dz) * 83492791LL);
+						if (spatialHash.count(hashKey)) {
+							for (int idx : spatialHash[hashKey]) {
+								const WELDED_VERTEX& uvtx = m_weldedVertices[idx];
+								// 位置・UV・ウェイトのみで判定（法線判定なし）
+								if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
+									if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
+										if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
+											global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
+											foundIndex = idx;
+											break;
+										}
+									}
 								}
 							}
 						}
@@ -93,7 +98,7 @@ void CModel::OptimizeVertices(void) {
 				foundIndex = (int)m_weldedVertices.size();
 				WELDED_VERTEX newVtx;
 				newVtx.p = vert;
-				newVtx.n = norm;
+				newVtx.n = D3DXVECTOR3(0, 0, 0); // 法線はゼロで初期化（Phase 2で計算）
 				newVtx.u = u;
 				newVtx.v = v;
 				newVtx.weights[0] = b1_1;
@@ -102,6 +107,8 @@ void CModel::OptimizeVertices(void) {
 				newVtx.globalBones[1] = global_bone_2;
 				newVtx.originalIndex = originalNo;
 				m_weldedVertices.push_back(newVtx);
+
+				long long hashKey = (hx * 73856093LL) ^ (hy * 19349663LL) ^ (hz * 83492791LL);
 				spatialHash[hashKey].push_back(foundIndex);
 			}
 			m_vertexRemap[originalNo] = foundIndex;
@@ -109,6 +116,81 @@ void CModel::OptimizeVertices(void) {
 		(pMesh->m_lpVB1)->Unlock();
 		(pMesh->m_lpVB2)->Unlock();
 		pMesh = (CMesh*)pMesh->Next;
+	}
+
+	// === Phase 2: 面のジオメトリから法線を計算して各頂点に加算 ===
+	// Blenderの「面から法線を計算」と同等の処理
+	int vCnt = 0;
+	pMesh = (CMesh*)m_Meshs.Top();
+	while (pMesh != NULL) {
+		WORD* pI, * pIndex;
+		int i1, i2, i3, t1, t2, t3;
+		int dispCheck = pMesh->GetDispCheck();
+		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
+		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
+		while (pStream != NULL) {
+			int dispLevel = pStream->GetDispLevel();
+			if (g_mPCFlag && dispLevel != 0 && dispLevel < dispCheck) {
+				pStream = (CStream*)pStream->Next;
+				continue;
+			}
+			pI = pIndex + pStream->GetIndexStart();
+			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+				i1 = *pI++; i2 = *pI++;
+				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
+					i3 = *pI++;
+					if (i % 2) {
+						if (pMesh->m_FlipFlag) { t1 = i3; t2 = i2; t3 = i1; }
+						else { t1 = i1; t2 = i2; t3 = i3; }
+					} else {
+						if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
+						else { t1 = i3; t2 = i2; t3 = i1; }
+					}
+					int w1 = m_vertexRemap[t1 + vCnt];
+					int w2 = m_vertexRemap[t2 + vCnt];
+					int w3 = m_vertexRemap[t3 + vCnt];
+					// 退化三角形をスキップ
+					if (w1 != w2 && w2 != w3 && w1 != w3) {
+						D3DXVECTOR3 edge1 = m_weldedVertices[w2].p - m_weldedVertices[w1].p;
+						D3DXVECTOR3 edge2 = m_weldedVertices[w3].p - m_weldedVertices[w1].p;
+						D3DXVECTOR3 faceNormal;
+						D3DXVec3Cross(&faceNormal, &edge1, &edge2);
+						// 面法線を各頂点に加算
+						m_weldedVertices[w1].n += faceNormal;
+						m_weldedVertices[w2].n += faceNormal;
+						m_weldedVertices[w3].n += faceNormal;
+					}
+					i1 = i2; i2 = i3;
+				}
+			} else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
+					i1 = *pI++; i2 = *pI++; i3 = *pI++;
+					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
+					else { t1 = i3; t2 = i2; t3 = i1; }
+					int w1 = m_vertexRemap[t1 + vCnt];
+					int w2 = m_vertexRemap[t2 + vCnt];
+					int w3 = m_vertexRemap[t3 + vCnt];
+					if (w1 != w2 && w2 != w3 && w1 != w3) {
+						D3DXVECTOR3 edge1 = m_weldedVertices[w2].p - m_weldedVertices[w1].p;
+						D3DXVECTOR3 edge2 = m_weldedVertices[w3].p - m_weldedVertices[w1].p;
+						D3DXVECTOR3 faceNormal;
+						D3DXVec3Cross(&faceNormal, &edge1, &edge2);
+						m_weldedVertices[w1].n += faceNormal;
+						m_weldedVertices[w2].n += faceNormal;
+						m_weldedVertices[w3].n += faceNormal;
+					}
+				}
+			}
+			pStream = (CStream*)pStream->Next;
+		}
+		(pMesh->m_lpIB)->Unlock();
+		vCnt += pMesh->m_NumVertices;
+		pMesh = (CMesh*)pMesh->Next;
+	}
+
+	// === Phase 3: 加算された法線を正規化して平均法線を得る ===
+	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
+		D3DXVec3Normalize(&m_weldedVertices[i].n, &m_weldedVertices[i].n);
 	}
 }
 
