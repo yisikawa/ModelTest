@@ -1105,7 +1105,7 @@ bool CModel::outputAnimationX(FILE* fd, int boneNo) {
 	}
 	fprintf(fd, ";\n");
 	XTab -= 2; PrintTab(fd, XTab); fprintf(fd, "}\n");
-	--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
+	XTab -= 2; PrintTab(fd, XTab); fprintf(fd, "}\n");
 	return true;
 }
 
