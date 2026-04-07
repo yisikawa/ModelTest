@@ -334,47 +334,42 @@ D3DXVECTOR3 D3DXMat2Trans(const D3DXMATRIX& d3dxMatrix)
 	translation.z = d3dxMatrix.m[3][2];
 	return translation;
 }
-
 D3DXVECTOR3 D3DXMat2Scale(const D3DXMATRIX& d3dxMatrix)
 {
-	D3DXVECTOR3 scale(0., 0., 0.);
-	// スケール成分の抽出
-	scale.x = D3DXVec3Length(reinterpret_cast<const D3DXVECTOR3*>(&d3dxMatrix.m[0][0]));
-	scale.y = D3DXVec3Length(reinterpret_cast<const D3DXVECTOR3*>(&d3dxMatrix.m[1][0]));
-	scale.z = D3DXVec3Length(reinterpret_cast<const D3DXVECTOR3*>(&d3dxMatrix.m[2][0]));
-	return scale;
+	float sx = sqrt(d3dxMatrix._11 * d3dxMatrix._11 + d3dxMatrix._12 * d3dxMatrix._12 + d3dxMatrix._13 * d3dxMatrix._13);
+	float sy = sqrt(d3dxMatrix._21 * d3dxMatrix._21 + d3dxMatrix._22 * d3dxMatrix._22 + d3dxMatrix._23 * d3dxMatrix._23);
+	float sz = sqrt(d3dxMatrix._31 * d3dxMatrix._31 + d3dxMatrix._32 * d3dxMatrix._32 + d3dxMatrix._33 * d3dxMatrix._33);
+	return D3DXVECTOR3(sx, sy, sz);
 }
 
 D3DXVECTOR3 D3DXMat2Euler(const D3DXMATRIX& mat)
 {
-	FbxAMatrix  rotMat;
-	FbxQuaternion qq(0., 0., 0., 1.);
-	D3DXVECTOR3 euler(0., 0., 0.);
-	D3DXQUATERNION q(0., 0., 0., 1.);
+	D3DXVECTOR3 x(mat._11, mat._12, mat._13);
+	D3DXVECTOR3 y(mat._21, mat._22, mat._23);
+	D3DXVECTOR3 z(mat._31, mat._32, mat._33);
+	D3DXVec3Normalize(&x, &x);
+	D3DXVec3Normalize(&y, &y);
+	D3DXVec3Normalize(&z, &z);
 
-	D3DXQuaternionRotationMatrix(&q, &mat);
-	qq.Set(q.x, q.y, q.z, q.w);
-	rotMat.SetQ(qq);
-	FbxVector4 fbxEuler = rotMat.GetR();
-	euler.x = (float)fbxEuler[0];
-	euler.y = (float)fbxEuler[1];
-	euler.z = (float)fbxEuler[2];
-	//// Roll (X軸の回転)
-	//double sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
-	//double cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-	//euler.x = (float)(std::atan2(sinr_cosp, cosr_cosp)*180. / PAI);
-	//// Pitch (Y軸の回転)
-	//double sinp = 2 * (q.w * q.y - q.z * q.x);
-	//if (std::abs(sinp) >= 1)
-	//	euler.y = (float)(std::copysign(PAI/2., sinp) * 180. / PAI);	// 90度のクランプ
-	//else
-	//	euler.y = (float)(std::asin(sinp) * 180. / PAI);
-	//// Yaw (Z軸の回転)
-	//double siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-	//double cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-	//euler.z = (float)(std::atan2(siny_cosp, cosy_cosp) * 180. / PAI);
-	return euler;
+	D3DXMATRIX rot;
+	D3DXMatrixIdentity(&rot);
+	rot._11 = x.x; rot._12 = x.y; rot._13 = x.z;
+	rot._21 = y.x; rot._22 = y.y; rot._23 = y.z;
+	rot._31 = z.x; rot._32 = z.y; rot._33 = z.z;
+
+	D3DXQUATERNION q;
+	D3DXQuaternionRotationMatrix(&q, &rot);
+	D3DXQuaternionNormalize(&q, &q);
+
+	fbxsdk::FbxAMatrix fbxRot;
+	fbxRot.SetQ(fbxsdk::FbxQuaternion(q.x, q.y, q.z, q.w));
+	fbxsdk::FbxVector4 fbxEuler = fbxRot.GetR();
+	
+	return D3DXVECTOR3((float)fbxEuler[0], (float)fbxEuler[1], (float)fbxEuler[2]);
 }
+
+
+
 
 bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 {
@@ -411,6 +406,8 @@ bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 		FbxSkeleton* pCBoneAttribute = FbxSkeleton::Create(pScene, (string(m_Bones[i].m_Name)+"_Skel").c_str());
 		pCBoneAttribute->SetSkeletonType(FbxSkeleton::eLimbNode); // リムノードタイプを設定
 		pCBoneNode->SetNodeAttribute(pCBoneAttribute);
+		pCBoneNode->RotationOrder.Set(fbxsdk::FbxEuler::eEulerXYZ);
+		pCBoneNode->RotationOrder.Set(fbxsdk::FbxEuler::eEulerXYZ);
 		t = D3DXMat2Trans(m_Bones[i].m_mTransform); s = D3DXMat2Scale(m_Bones[i].m_mTransform); r = D3DXMat2Euler(m_Bones[i].m_mTransform);
 		pCBoneNode->LclTranslation.Set(FbxVector4(t.x, t.y,t.z));
 		pCBoneNode->LclScaling.Set(FbxVector4(s.x, s.y, s.z));
@@ -493,7 +490,7 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
     fbxStart.SetSecondDouble(0.0);
     fbxEnd.SetSecondDouble(0.0);
 
-	// 【修正1】ノード名→FbxNodeのマップを事前構築（O(N2)→O(N)に改善）
+	// ノード名→FbxNodeのマップを事前構築（O(N2)→O(N)に改善）
 	std::unordered_map<std::string, FbxNode*> nodeMap;
 	for (int j = 0; j < pScene->GetNodeCount(); j++) {
 		FbxNode* pN = pScene->GetNode(j);
@@ -504,7 +501,7 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 
 	FbxNode* pNode;
 	for (int i = 0; i < m_nBone; i++) {
-		// 【修正1】マップによるO(1)検索
+		// マップによるO(1)検索
 		auto it = nodeMap.find(std::string(m_Bones[i].m_Name));
 		if (it == nodeMap.end()) continue;	// 見つからなければスキップ
 		pNode = it->second;
@@ -525,7 +522,8 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 		int tboneNo = i;
 		int keyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
 		int tkeyNum = keyNum;
-		// 【修正4】キーフレーム数0のフォールバックに安全チェックを追加
+		pNode->RotationOrder.Set(fbxsdk::FbxEuler::eEulerXYZ);
+		// キーフレーム数0のフォールバックに安全チェックを追加
 		if (keyNum <= 0) {
 			tboneNo = 0;
 			tkeyNum = m_MotionArray[tboneNo].m_RotationKeyNum;
@@ -535,12 +533,14 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 			}
 		}
 
-		// 【修正3】KeyModifyBegin はループの外で1回だけ呼ぶ
+		// KeyModifyBegin はループの外で1回だけ呼ぶ
 		curveTX->KeyModifyBegin(); curveTY->KeyModifyBegin(); curveTZ->KeyModifyBegin();
 		curveRX->KeyModifyBegin(); curveRY->KeyModifyBegin(); curveRZ->KeyModifyBegin();
 		curveSX->KeyModifyBegin(); curveSY->KeyModifyBegin(); curveSZ->KeyModifyBegin();
 
-		FbxVector4 lastEuler(0.0, 0.0, 0.0); // 【修正】直前のオイラー角を保存
+		// アニメーションの前の値をバインドポーズの回転で初期化
+		D3DXVECTOR3 bindR = D3DXMat2Euler(m_Bones[i].m_mTransform);
+		FbxVector4 lastEuler(bindR.x, bindR.y, bindR.z, 0.0); // 【修正】直前のオイラー角を保存
 
 		for (int k = 0; k < tkeyNum; k++) {
 			FbxTime fbxTime;
@@ -548,7 +548,7 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
                     if (fbxTime > fbxEnd) fbxEnd = fbxTime;
 			D3DXMATRIX iMatrix;
 			if (keyNum > 0) {
-				// 【修正7】GetAnimationMatrix のNULLチェック
+				// GetAnimationMatrix のNULLチェック
 				D3DXMATRIX* pAnimMat = m_MotionArray[tboneNo].GetAnimationMatrix(k, &m_Bones[tboneNo].m_mTransform);
 				if (pAnimMat != NULL) {
 					iMatrix = m_Bones[tboneNo].m_mTransform;
@@ -561,10 +561,18 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 				iMatrix = m_Bones[i].m_mTransform;
 			}
 			t = D3DXMat2Trans(iMatrix); s = D3DXMat2Scale(iMatrix);
-			D3DXQuaternionRotationMatrix(&q, &iMatrix); qq.Set(q.x, q.y, q.z, q.w);
+			
+			// 回転成分抽出のための正規化
+			D3DXMATRIX matNorm = iMatrix;
+			D3DXVec3Normalize((D3DXVECTOR3*)&matNorm.m[0][0], (D3DXVECTOR3*)&matNorm.m[0][0]);
+			D3DXVec3Normalize((D3DXVECTOR3*)&matNorm.m[1][0], (D3DXVECTOR3*)&matNorm.m[1][0]);
+			D3DXVec3Normalize((D3DXVECTOR3*)&matNorm.m[2][0], (D3DXVECTOR3*)&matNorm.m[2][0]);
+			D3DXQuaternionRotationMatrix(&q, &matNorm); 
+			
+			qq.Set(q.x, q.y, q.z, q.w);
 			fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
 
-			// 【修正2】KeyInsert の戻り値をインデックスとして使用
+			// KeyInsert の戻り値をインデックスとして使用
 			// 位置キーフレーム設定
 			FbxVector4 val = fMat.GetT();
 			int idxTX = curveTX->KeyInsert(fbxTime);
@@ -578,16 +586,29 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 			curveTZ->KeySetInterpolation(idxTZ, FbxAnimCurveDef::eInterpolationLinear);
 
 			// 回転キーフレーム設定
-			val = fMat.GetR();
-			
-			// 【修正】オイラー角のフリップ（360度回転異常）を防ぐためのUnroll処理
-			if (k > 0) {
-				for (int axis = 0; axis < 3; axis++) {
-					double diff = val[axis] - lastEuler[axis];
-					while (diff > 180.0) diff -= 360.0;
-					while (diff < -180.0) diff += 360.0;
-					val[axis] = lastEuler[axis] + diff;
+			D3DXVECTOR3 angst = D3DXMat2Euler(iMatrix);
+			val.Set(angst.x, angst.y, angst.z, 0.0);
+			{
+				FbxVector4 v1 = val;
+				FbxVector4 v2(v1[0] + 180.0, 180.0 - v1[1], v1[2] + 180.0, 0.0);
+				for (int j = 0; j < 3; j++) {
+					while (v1[j] - lastEuler[j] > 180.01) v1[j] -= 360.0;
+					while (v1[j] - lastEuler[j] < -180.01) v1[j] += 360.0;
+					while (v2[j] - lastEuler[j] > 180.01) v2[j] -= 360.0;
+					while (v2[j] - lastEuler[j] < -180.01) v2[j] += 360.0;
 				}
+				double d1 = fabs(v1[0] - lastEuler[0]) + fabs(v1[1] - lastEuler[1]) + fabs(v1[2] - lastEuler[2]);
+				double d2 = fabs(v2[0] - lastEuler[0]) + fabs(v2[1] - lastEuler[1]) + fabs(v2[2] - lastEuler[2]);
+				if (d2 < d1) val = v2;
+				else val = v1;
+				//for (int axis = 0; axis < 3; axis++) {
+				//	double diff = val[axis] - lastEuler[axis];
+				//	if (fabs(diff) > 45.0) {
+				//		char buf[512];
+				//		sprintf_s(buf, "FBX_ANIM_CHECK: Bone[%03d](%s) Frame[%d] Axis[%d] Jump: %f -> %f (Delta: %f)\n", tboneNo, m_Bones[tboneNo].m_Name, k, axis, lastEuler[axis], val[axis], diff);
+				//		OutputDebugStringA(buf);
+				//	}
+				//}
 			}
 			lastEuler = val;
 
@@ -601,7 +622,7 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 			curveRZ->KeySetValue(idxRZ, (float)val[2]);
 			curveRZ->KeySetInterpolation(idxRZ, FbxAnimCurveDef::eInterpolationLinear);
 
-			// 【修正6】スケールキーフレーム設定（補間設定も有効化して統一）
+			// スケールキーフレーム設定（補間設定も有効化して統一）
 			val = fMat.GetS();
 			int idxSX = curveSX->KeyInsert(fbxTime);
 			curveSX->KeySetValue(idxSX, (float)val[0]);
@@ -614,10 +635,14 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
 			curveSZ->KeySetInterpolation(idxSZ, FbxAnimCurveDef::eInterpolationLinear);
 		}
 
-		// 【修正3】KeyModifyEnd はループの外で1回だけ呼ぶ
+		// KeyModifyEnd はループの外で1回だけ呼ぶ
 		curveTX->KeyModifyEnd(); curveTY->KeyModifyEnd(); curveTZ->KeyModifyEnd();
 		curveRX->KeyModifyEnd(); curveRY->KeyModifyEnd(); curveRZ->KeyModifyEnd();
 		curveSX->KeyModifyEnd(); curveSY->KeyModifyEnd(); curveSZ->KeyModifyEnd();
+
+		FbxAnimCurve* pRotationCurves[3] = { curveRX, curveRY, curveRZ };
+		FbxAnimCurveFilterUnroll unrollFilter;
+		unrollFilter.Apply(pRotationCurves, 3);
 	}
 
     pAnimStack->LocalStart.Set(fbxStart);
