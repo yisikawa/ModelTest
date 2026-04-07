@@ -70,6 +70,8 @@ void CModel::OptimizeVertices(void) {
 			long long hz = (long long)std::floor(vert.z / GRID_SIZE);
 
 			int foundIndex = -1;
+			/* // 頂点統合を無効化するため、検索ループをコメントアウト
+
 			// 隣接セルも検索して境界付近の頂点の結合漏れを防止
 			for (long long dx = -1; dx <= 1 && foundIndex == -1; dx++) {
 				for (long long dy = -1; dy <= 1 && foundIndex == -1; dy++) {
@@ -97,6 +99,7 @@ void CModel::OptimizeVertices(void) {
 				}
 			}
 
+			*/
 			if (foundIndex == -1) {
 				foundIndex = (int)m_weldedVertices.size();
 				WELDED_VERTEX newVtx;
