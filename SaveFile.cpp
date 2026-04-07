@@ -81,10 +81,13 @@ void CModel::OptimizeVertices(void) {
 								// 位置・UV・ウェイトのみで判定（法線判定なし）
 								if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
 									if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
+										D3DXVECTOR3 norm(pV1->n.x, pV1->n.y, pV1->n.z);
 										if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
 											global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
-											foundIndex = idx;
-											break;
+											if (D3DXVec3LengthSq(&(norm - uvtx.n)) <= 0.0001f) {
+												foundIndex = idx;
+												break;
+											}
 										}
 									}
 								}
