@@ -30,7 +30,7 @@ char* strcpynosp(char* string1, char* string2);//空白を除いて文字列をコピーする
 //		FBXファイルセーブ
 //		データをFBXフォーマットで出力します
 //======================================================================
-void CModel::OptimizeVertices(void) {
+void CModel::OptimizeVertices(bool enable) {
 	int numVer = totalVertex();
 	if (m_vertexRemap.size() == numVer && m_weldedVertices.size() > 0) {
 		return;
@@ -70,23 +70,21 @@ void CModel::OptimizeVertices(void) {
 			long long hz = (long long)std::floor(vert.z / GRID_SIZE);
 
 			int foundIndex = -1;
-			/* // 頂点統合を無効化するため、検索ループをコメントアウト
-
-			// 隣接セルも検索して境界付近の頂点の結合漏れを防止
-			for (long long dx = -1; dx <= 1 && foundIndex == -1; dx++) {
-				for (long long dy = -1; dy <= 1 && foundIndex == -1; dy++) {
-					for (long long dz = -1; dz <= 1 && foundIndex == -1; dz++) {
-						long long hashKey = ((hx + dx) * 73856093LL) ^ ((hy + dy) * 19349663LL) ^ ((hz + dz) * 83492791LL);
-						if (spatialHash.count(hashKey)) {
-							for (int idx : spatialHash[hashKey]) {
-								const WELDED_VERTEX& uvtx = m_weldedVertices[idx];
-								// 位置・UV・ウェイトのみで判定（法線判定なし）
-								if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
-									if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
-										D3DXVECTOR3 norm(pV1->n.x, pV1->n.y, pV1->n.z);
-										if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
-											global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
-											if (D3DXVec3LengthSq(&(norm - uvtx.n)) <= 0.0001f) {
+			// 頂点統合を無効化するため、引数にフラグ設定
+			if (enable) {
+				// 隣接セルも検索して境界付近の頂点の結合漏れを防止
+				for (long long dx = -1; dx <= 1 && foundIndex == -1; dx++) {
+					for (long long dy = -1; dy <= 1 && foundIndex == -1; dy++) {
+						for (long long dz = -1; dz <= 1 && foundIndex == -1; dz++) {
+							long long hashKey = ((hx + dx) * 73856093LL) ^ ((hy + dy) * 19349663LL) ^ ((hz + dz) * 83492791LL);
+							if (spatialHash.count(hashKey)) {
+								for (int idx : spatialHash[hashKey]) {
+									const WELDED_VERTEX& uvtx = m_weldedVertices[idx];
+									// 位置・UV・ウェイトのみで判定（法線判定なし）
+									if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
+										if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
+											if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
+												global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
 												foundIndex = idx;
 												break;
 											}
@@ -97,9 +95,8 @@ void CModel::OptimizeVertices(void) {
 						}
 					}
 				}
-			}
 
-			*/
+			}
 			if (foundIndex == -1) {
 				foundIndex = (int)m_weldedVertices.size();
 				WELDED_VERTEX newVtx;
@@ -215,7 +212,7 @@ bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 	uvElement->SetMappingMode(FbxGeometryElement::eByControlPoint); // 頂点ごとにUVを設定
 	uvElement->SetReferenceMode(FbxGeometryElement::eDirect); // UVを直接指定
 
-	OptimizeVertices();
+	OptimizeVertices(true);
 
 	pfbxMesh->InitControlPoints((int)m_weldedVertices.size());
 	for (size_t i = 0; i < m_weldedVertices.size(); i++) {
@@ -1003,7 +1000,7 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
-	OptimizeVertices();
+	OptimizeVertices(false);
 	outputVertex(fd);
 	outputFace(fd);
 	//法線出力

@@ -546,7 +546,7 @@ public:
 	virtual int		totalVertex(void);
 	virtual int		totalFace(void);
 	virtual int		countBone2Ver(int boneNo);
-	virtual void	OptimizeVertices(void);
+	virtual void	OptimizeVertices(bool enable);
 	virtual bool	outputBone2VerNo(FILE *fd, int boneNo);
 	virtual bool	outputBone2VerWeight(FILE *fd, int boneNo);
 	virtual bool	saveX(char *FPath, char *FName);
