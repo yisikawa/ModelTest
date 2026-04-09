@@ -2635,7 +2635,7 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 
 	strcpy(path, FileName);
 	convert_tex_path(path);
-	HANDLE	hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	HANDLE	hFile = CreateFile(FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
 	    pdat = new char[dwSize]();
@@ -3350,7 +3350,7 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 	unsigned long	cnt;
 	strcpy(path, FileName);
 	convert_tex_path(path);
-	HANDLE hFile = CreateFile(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
+	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
 	    pdat = new char[dwSize]();
