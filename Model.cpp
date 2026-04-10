@@ -39,6 +39,8 @@ extern	D3DXVECTOR3	g_mLightPosition;
 extern	D3DXMATRIX	g_mViewLight;					// ライトから見た場合のビューマトリックス
 extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
 extern	int			g_mDispBoneNo,g_mShlBoneNoR,g_mShlBoneNoL;
+extern	char		g_meshPath[];
+extern	char		g_texPath[];
 
 // 二刀流コンバートテーブル
 int g_mBLCnvTbl[9][10] = {
@@ -2603,11 +2605,11 @@ CData::~CData()
 //
 //======================================================================
 
-bool convert_tex_path(char* src) {
+bool convert_path(char* src, const char* base) {
 	// 検索の目印となる文字列（ゲームのデータフォルダ名）
-	static const char* search_term = "ROM\\";
+	static const char* search_term = "ROM";
 	// 新しいベースディレクトリ
-	static const char* new_base = "Z:\\DataFBX\\FFXI\\";
+	static const char* new_base = base;
 	// "ROM\" が出現する位置を検索
 	const char* relative_path = strstr(src, search_term);
 	if (relative_path != NULL) {
@@ -2634,8 +2636,10 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 	unsigned long	cnt;
 
 	strcpy(path, FileName);
-	convert_tex_path(path);
-	HANDLE	hFile = CreateFile(FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
+	if (strlen(g_texPath) > 0) {
+		convert_path(path, g_texPath);
+	}
+	HANDLE	hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_ARCHIVE, NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
 	    pdat = new char[dwSize]();
@@ -3349,8 +3353,10 @@ HRESULT CModel::LoadMeshFromFile( char *FileName, unsigned long FVF,int PartsNo 
 	int dwSize;
 	unsigned long	cnt;
 	strcpy(path, FileName);
-	convert_tex_path(path);
-	HANDLE hFile = CreateFile(FileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
+	if (strlen(g_meshPath) > 0) {
+		convert_path(path, g_meshPath);
+	}
+	HANDLE hFile = CreateFile(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_ARCHIVE,NULL);
 	if( hFile!=INVALID_HANDLE_VALUE ){
 		dwSize = GetFileSize(hFile,NULL);
 	    pdat = new char[dwSize]();

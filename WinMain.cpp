@@ -10,6 +10,9 @@
 #include "model.h"
 #include "resource.h"
 #include <commdlg.h>
+#include <string>
+#include <vector>
+#include <fstream>
 
 #pragma comment(lib,"comdlg32.lib")
 
@@ -30,6 +33,8 @@ BOOL GetFileNameFromDir2(LPSTR filename,char *DataName );
 #define PAI					(3.1415926535897932384626433832795f)
 #define PAI2				(PAI*2.0f)
 char	ffxidir[512];
+char	g_meshPath[512] = "";
+char	g_texPath[512] = "";
 bool	g_mDispWire = true,g_mDispIdl = true,g_mDispBone = false;
 //								hum m   hum f   el m    el f    tar m   tar f   M       G
 int		g_mShlBoneTbl[8][2]={ {64,78},{60,45},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0}};
@@ -261,6 +266,32 @@ BOOL  GetFileNameFromDir2(LPSTR filename,char *DataName )
 	return TRUE;
 }
 
+void LoadInitFile() {
+	std::ifstream ifs(".ini");
+	if (!ifs.is_open()) return;
+	std::string line;
+	while (std::getline(ifs, line)) {
+		size_t pos = line.find('=');
+		if (pos != std::string::npos) {
+			std::string key = line.substr(0, pos);
+			std::string val = line.substr(pos + 1);
+			// Trim whitespace and newlines
+			key.erase(key.find_last_not_of(" \t\r\n") + 1);
+			key.erase(0, key.find_first_not_of(" \t\r\n"));
+			val.erase(val.find_last_not_of(" \t\r\n") + 1);
+			val.erase(0, val.find_first_not_of(" \t\r\n"));
+
+			if (key == "MESH_PATH") {
+				strncpy(g_meshPath, val.c_str(), sizeof(g_meshPath) - 1);
+				strncpy(ffxidir, val.c_str(), sizeof(ffxidir) - 1);
+			}
+			else if (key == "TEX_PATH") {
+				strncpy(g_texPath, val.c_str(), sizeof(g_texPath) - 1);
+			}
+		}
+	}
+}
+
 //======================================================================
 //
 //		WinMainä÷êî
@@ -270,6 +301,7 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 {
 	HKEY hKey;
 	GetCurrentDirectory(sizeof(execDir),execDir);
+	LoadInitFile();
 #if 0
 	strcpy(ffxidir,"C:\\cross1");
 #else
