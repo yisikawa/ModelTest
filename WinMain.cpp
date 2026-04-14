@@ -1,4 +1,4 @@
-//======================================================================
+ï»¿//======================================================================
 // INCLUDE
 //======================================================================
 #define _CRT_SECURE_NO_WARNINGS
@@ -46,36 +46,36 @@ extern	D3DXMATRIX		g_mProjection, g_mView,g_mEyeMat;
 extern	float			g_mEyeScale,g_mEyeAlph,g_mEyeBeta;
 extern	float			g_mLightAlph,g_mLightBeta;
 extern	D3DXVECTOR3		g_mEye,g_mEyebase,g_mAt,g_mUp;
-extern	float			g_mFov;				// FOV : 60“x
-extern	float			g_mAspect;			// ‰æ–Ê‚ÌƒAƒXƒyƒNƒg”ä
-extern	float			g_mNear_z;			// Å‹ßÚ‹——£
-extern	float			g_mFar_z;			// Å‰“•û‹——£
+extern	float			g_mFov;				// FOV : 60åº¦
+extern	float			g_mAspect;			// ç”»é¢ã®ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”
+extern	float			g_mNear_z;			// æœ€è¿‘æ¥è·é›¢
+extern	float			g_mFar_z;			// æœ€é æ–¹è·é›¢
 extern  bool			g_mPCFlag;
-extern  int				g_mPCMotion;		// PC‚Ìƒ‚[ƒVƒ‡ƒ“í—Ş
+extern  int				g_mPCMotion;		// PCã®ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³ç¨®é¡
 		long			g_mScreenWidth	= 800;
 		long			g_mScreenHeight	= 600;
 static	char			*AppName = "EwhM ver0.1";
 static	char			*ClassName = "Model Test";
 static	DWORD			FPS;
 
-HWND hWindow;				// ƒEƒBƒ“ƒhƒEƒnƒ“ƒhƒ‹
-HWND hDlg2;					// ƒ_ƒCƒAƒƒO‚Q
+HWND hWindow;				// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ãƒãƒ³ãƒ‰ãƒ«
+HWND hDlg2;					// ãƒ€ã‚¤ã‚¢ãƒ­ã‚°ï¼’
 
 extern	int				g_mMotionSpeed;
 		unsigned long	Polygons;
 
 static const	LPCTSTR		ListRace[] = {
-	"1-27-82,ƒqƒ…[ƒ€‰","1-32-58,ƒqƒ…[ƒ€Š",
-	"1-37-31,ƒGƒ‹ƒ”ƒ@[ƒ“‰","1-42-4,ƒGƒ‹ƒ”ƒ@[ƒ“Š",
-	"1-46-93,ƒ^ƒ‹ƒ^ƒ‹‰","1-46-93,ƒ^ƒ‹ƒ^ƒ‹Š",
-	"1-51-89,ƒ~ƒXƒ‰","1-56-59,ƒKƒ‹ƒJ","1-0-0,‚È‚µ" };
+	"1-27-82,ãƒ’ãƒ¥ãƒ¼ãƒ â™‚","1-32-58,ãƒ’ãƒ¥ãƒ¼ãƒ â™€",
+	"1-37-31,ã‚¨ãƒ«ãƒ´ã‚¡ãƒ¼ãƒ³â™‚","1-42-4,ã‚¨ãƒ«ãƒ´ã‚¡ãƒ¼ãƒ³â™€",
+	"1-46-93,ã‚¿ãƒ«ã‚¿ãƒ«â™‚","1-46-93,ã‚¿ãƒ«ã‚¿ãƒ«â™€",
+	"1-51-89,ãƒŸã‚¹ãƒ©","1-56-59,ã‚¬ãƒ«ã‚«","1-0-0,ãªã—" };
 
 
 char	execDir[512];
 
 //======================================================================
 //
-//		ŠeíŠÖ”
+//		å„ç¨®é–¢æ•°
 //
 //======================================================================
 long GetScreenWidth( void ) { return g_mScreenWidth; }
@@ -84,13 +84,13 @@ HWND GetWindow( void ) { return hWindow; }
 void AdDrawPolygons( unsigned long polys ) { Polygons += polys; }
 
 static const	LPCTSTR		OriginRace[] = {
-	"ƒqƒ…[ƒ€‰","ƒqƒ…[ƒ€Š",
-	"ƒGƒ‹ƒ”ƒ@[ƒ“‰","ƒGƒ‹ƒ”ƒ@[ƒ“Š",
-	"ƒ^ƒ‹ƒ^ƒ‹‰","ƒ^ƒ‹ƒ^ƒ‹Š",
-	"ƒ~ƒXƒ‰","ƒKƒ‹ƒJ","‚È‚µ" };
+	"ãƒ’ãƒ¥ãƒ¼ãƒ â™‚","ãƒ’ãƒ¥ãƒ¼ãƒ â™€",
+	"ã‚¨ãƒ«ãƒ´ã‚¡ãƒ¼ãƒ³â™‚","ã‚¨ãƒ«ãƒ´ã‚¡ãƒ¼ãƒ³â™€",
+	"ã‚¿ãƒ«ã‚¿ãƒ«â™‚","ã‚¿ãƒ«ã‚¿ãƒ«â™€",
+	"ãƒŸã‚¹ãƒ©","ã‚¬ãƒ«ã‚«","ãªã—" };
 static const	LPCTSTR		OriginParts[] = {
-	"í‘°","Šç","“ª","“·","—¼è","—¼‹r","—¼‘«",
-	"‰Eè•Ší","¶è•Ší","‰“Šu•Ší" };
+	"ç¨®æ—","é¡”","é ­","èƒ´","ä¸¡æ‰‹","ä¸¡è„š","ä¸¡è¶³",
+	"å³æ‰‹æ­¦å™¨","å·¦æ‰‹æ­¦å™¨","é éš”æ­¦å™¨" };
 
 DWORD	ConvertStr2Dno2( char* DataName )
 {
@@ -192,7 +192,7 @@ DWORD _GetFileNameFromIDsub(DWORD dwV,DWORD dwID)
  
  // if( dwID>=51439 ) return 0;
   if( dwV!=1 && dwV!=2 ) return 0;
-  // ROM2‚ğ’²‚×‚é
+  // ROM2ã‚’èª¿ã¹ã‚‹
   lstrcpy(fname,ffxidir);
   if( dwV==1 ) lstrcat(fname,"VTABLE.DAT");
   else if( dwV==2 ) lstrcat(fname,"ROM2\\VTABLE2.DAT");
@@ -294,7 +294,7 @@ void LoadInitFile() {
 
 //======================================================================
 //
-//		WinMainŠÖ”
+//		WinMainé–¢æ•°
 //
 //======================================================================
 int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
@@ -313,7 +313,7 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 		RegCloseKey( hKey );
 	}
 	if( !*ffxidir ){
-		MessageBox(NULL,"FinalFantasyXI‚ğƒCƒ“ƒXƒg[ƒ‹‚µ‚Ä‚¢‚éPC‚Å‹N“®‚µ‚Ä‚­‚¾‚³‚¢BI","FF XI ‚ªƒCƒ“ƒXƒg[ƒ‹‚³‚ê‚Ä‚Ü‚¹‚ñ",MB_OK);
+		MessageBox(NULL,"FinalFantasyXIã‚’ã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã—ã¦ã„ã‚‹PCã§èµ·å‹•ã—ã¦ãã ã•ã„ã€‚ï¼","FF XI ãŒã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã•ã‚Œã¦ã¾ã›ã‚“",MB_OK);
 		GetCurrentDirectory(sizeof(ffxidir),ffxidir);
 		return -1;
 	}
@@ -326,7 +326,7 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 	timeBeginPeriod( 1 );
 
 	//============================================================
-	// ƒEƒBƒ“ƒhƒEƒNƒ‰ƒX“o˜^
+	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚¯ãƒ©ã‚¹ç™»éŒ²
 	//============================================================
 	WNDCLASS wc;
 	wc.style			= CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
@@ -342,13 +342,13 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 	if ( RegisterClass( &wc ) == NULL ) return false;
 	
 	//============================================================
-	// ƒEƒBƒ“ƒhƒEƒTƒCƒYæ“¾
+	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚ºå–å¾—
 	//============================================================
 	long window_w = g_mScreenWidth + GetSystemMetrics(SM_CXEDGE) + GetSystemMetrics(SM_CXBORDER) + GetSystemMetrics(SM_CXDLGFRAME);
 	long window_h = g_mScreenHeight + GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYBORDER) + GetSystemMetrics(SM_CYDLGFRAME) + GetSystemMetrics(SM_CYCAPTION);
 
 	//============================================================
-	// ƒEƒBƒ“ƒhƒE¶¬
+	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ç”Ÿæˆ
 	//============================================================
 	hWindow = CreateWindowEx(
 				WS_EX_APPWINDOW,
@@ -363,29 +363,29 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 				NULL,
 				inst,
 				NULL );
-	// ƒ_ƒCƒAƒƒO‚Qì¬
+	// ãƒ€ã‚¤ã‚¢ãƒ­ã‚°ï¼’ä½œæˆ
 	hDlg2 = CreateDialog((HINSTANCE)GetWindowLong(hWindow,GWL_HINSTANCE),MAKEINTRESOURCE(IDD_DIALOG2),NULL,(DLGPROC)Dlg2Proc);
 	InvalidateRect(hDlg2, NULL, TRUE);
 	SetWindowPos( hDlg2,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE );
 	ShowWindow( hDlg2,SW_HIDE );
 	ShowWindow( hWindow,SW_SHOW );
 	//============================================================
-	// DirectXGraphics‰Šú‰»
+	// DirectXGraphicsåˆæœŸåŒ–
 	//============================================================
 	if ( InitD3D() == false ) return false;
 	//============================================================
-	// •`‰æˆ—‰Šú‰»
+	// æç”»å‡¦ç†åˆæœŸåŒ–
 	//============================================================
 	if ( InitRender() == false ) return false;
 	//============================================================
-	// ƒƒbƒZ[ƒWƒ‹[ƒv
+	// ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ãƒ«ãƒ¼ãƒ—
 	//============================================================
 	MSG msg;
 	D3DXVECTOR3	PosPC;
 	while ( true )
 	{
 		//==================================================
-		// ƒƒbƒZ[ƒWˆ—
+		// ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸å‡¦ç†
 		//==================================================
 		if ( PeekMessage( &msg, 0, 0, 0, PM_REMOVE ) ) {
 			if( !IsDialogMessage(hDlg2,&msg) ) {
@@ -395,11 +395,11 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 			}
 		}
 		//==================================================
-		// ‘¼
+		// ä»–
 		//==================================================
 		else{
 			//======================================
-			// FPS‚ÌŒv‘ª
+			// FPSã®è¨ˆæ¸¬
 			//======================================
 			
 			static DWORD cnt=0,BeforeTime = timeGetTime();
@@ -425,23 +425,23 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 			FPS++;
 
 			//======================================
-			// Direct3D‚Ì•`‰æ
+			// Direct3Dã®æç”»
 			//======================================
 
-			// ƒoƒbƒNƒoƒbƒtƒ@‚Æ Z ƒoƒbƒtƒ@‚ğƒNƒŠƒA
+			// ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ã¨ Z ãƒãƒƒãƒ•ã‚¡ã‚’ã‚¯ãƒªã‚¢
 			GetDevice()->Clear( 0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER| D3DCLEAR_STENCIL, D3DCOLOR_XRGB(200,200,255), 1.f, 0 );
 //			GetDevice()->Clear( 0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(0,0,0), 1, 0 );
-			// ƒV[ƒ“ŠJn
+			// ã‚·ãƒ¼ãƒ³é–‹å§‹
 			if SUCCEEDED( GetDevice()->BeginScene() ) {
-				// Šeíˆ—
+				// å„ç¨®å‡¦ç†
 				Rendering();
 
-				// ƒV[ƒ“I—¹
+				// ã‚·ãƒ¼ãƒ³çµ‚äº†
 				GetDevice()->EndScene();
 
-				// ƒoƒbƒNƒoƒbƒtƒ@‚Ì“à—e‚ğƒvƒ‰ƒCƒ}ƒŠ‚É“]‘—
+				// ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ã®å†…å®¹ã‚’ãƒ—ãƒ©ã‚¤ãƒãƒªã«è»¢é€
 				if FAILED( GetDevice()->Present( NULL, NULL, NULL, NULL ) ) {
-					// ƒŠƒZƒbƒg
+					// ãƒªã‚»ãƒƒãƒˆ
 					GetDevice()->Reset( GetAdapter() );
 				}
 			}
@@ -449,17 +449,17 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 	}
 
 	//============================================================
-	// •`‰æˆ—ŠJ•ú
+	// æç”»å‡¦ç†é–‹æ”¾
 	//============================================================
 	UnInitRender();
 
 	//============================================================
-	// DirectXGraphicsŠJ•ú
+	// DirectXGraphicsé–‹æ”¾
 	//============================================================
 	ReleaseD3D();
 
 	//============================================================
-	// ‚¨‚µ‚Ü‚¢
+	// ãŠã—ã¾ã„
 	//============================================================
 	timeEndPeriod( 1 );
 
@@ -470,36 +470,36 @@ void Inventory_init(void)
 {
 	char	ComboString[128];
 	int		ComboNo;
-	//	í‘°‚Ìİ’è
+	//	ç¨®æ—ã®è¨­å®š
 	ComboNo = (int)(DWORD)SendMessage(GetDlgItem(hDlg2, IDC_COMBO1), CB_GETCURSEL, 0L, 0L);
 	pPC->SetType( ComboNo );
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO1), ComboString, sizeof(ComboString));
 	pPC->SetRace(ConvertStr2Dno2( ComboString ));
-	//	Šç‚Ìİ’è
+	//	é¡”ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO2), ComboString, sizeof(ComboString));
 	pPC->SetFace(ConvertStr2Dno2( ComboString ));
-	//	“ª‚Ìİ’è
+	//	é ­ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO3), ComboString, sizeof(ComboString));
 	pPC->SetHead(ConvertStr2Dno2( ComboString ));
-	//	“·‚Ìİ’è
+	//	èƒ´ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO4), ComboString, sizeof(ComboString));
 	pPC->SetBody(ConvertStr2Dno2( ComboString ));
-	//	è‚Ìİ’è
+	//	æ‰‹ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO5), ComboString, sizeof(ComboString));
 	pPC->SetHand(ConvertStr2Dno2( ComboString ));
-	//	‹r‚Ìİ’è
+	//	è„šã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO6), ComboString, sizeof(ComboString));
 	pPC->SetLegs(ConvertStr2Dno2( ComboString ));
- 	//	‘«‚Ìİ’è
+ 	//	è¶³ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO7), ComboString, sizeof(ComboString));
 	pPC->SetFoot(ConvertStr2Dno2( ComboString ));
- 	//	‰Eè•Ší‚Ìİ’è
+ 	//	å³æ‰‹æ­¦å™¨ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO10), ComboString, sizeof(ComboString));
 	pPC->SetRightWeapon(ConvertStr2Dno2( ComboString ));
- 	//	¶è•Ší‚Ìİ’è
+ 	//	å·¦æ‰‹æ­¦å™¨ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO11), ComboString, sizeof(ComboString));
 	pPC->SetLeftWeapon(ConvertStr2Dno2( ComboString ));
- 	//	‰“Šu‚Ìİ’è
+ 	//	é éš”ã®è¨­å®š
 	GetWindowText(GetDlgItem(hDlg2, IDC_COMBO12), ComboString, sizeof(ComboString));
 	pPC->SetRemoteWeapon(ConvertStr2Dno2( ComboString ));
 }
@@ -508,7 +508,7 @@ void InventoryReverce(void)
 {
 	char	ComboString[128];
 	int		ComboNo;
-	//	Šç‚Ìİ’è
+	//	é¡”ã®è¨­å®š
 	ComboNo = pPC->GetFace();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO2), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -519,7 +519,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO2), CB_SETCURSEL, ComboNo, 0);
 	}
-	//	“ª‚Ìİ’è
+	//	é ­ã®è¨­å®š
 	ComboNo = pPC->GetHead();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO3), CB_FINDSTRING, 0,(LPARAM)ComboString);
@@ -530,7 +530,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO3), CB_SETCURSEL, ComboNo, 0);
 	}
-	//	“·‚Ìİ’è
+	//	èƒ´ã®è¨­å®š
 	ComboNo = pPC->GetBody();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO4), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -541,7 +541,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO4), CB_SETCURSEL, ComboNo, 0);
 	}
-	//	è‚Ìİ’è
+	//	æ‰‹ã®è¨­å®š
 	ComboNo = pPC->GetHand();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO5), CB_FINDSTRING, 0,(LPARAM)ComboString);
@@ -552,7 +552,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO5), CB_SETCURSEL, ComboNo, 0);
 	}
-	//	‹r‚Ìİ’è
+	//	è„šã®è¨­å®š
 	ComboNo = pPC->GetLegs();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO6), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -563,7 +563,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO6), CB_SETCURSEL, ComboNo, 0);
 	}
- 	//	‘«‚Ìİ’è
+ 	//	è¶³ã®è¨­å®š
 	ComboNo = pPC->GetFoot();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO7), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -574,7 +574,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO7), CB_SETCURSEL, ComboNo, 0);
 	}
- 	//	‰Eè•Ší‚Ìİ’è
+ 	//	å³æ‰‹æ­¦å™¨ã®è¨­å®š
 	ComboNo = pPC->GetRightWeapon();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO10), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -585,7 +585,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO10), CB_SETCURSEL, ComboNo, 0);
 	}
- 	//	¶è•Ší‚Ìİ’è
+ 	//	å·¦æ‰‹æ­¦å™¨ã®è¨­å®š
 	ComboNo = pPC->GetLeftWeapon();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO11), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -596,7 +596,7 @@ void InventoryReverce(void)
 	} else {
 		SendMessage(GetDlgItem(hDlg2, IDC_COMBO11), CB_SETCURSEL, ComboNo, 0);
 	}
- 	//	‰“Šu‚Ìİ’è
+ 	//	é éš”ã®è¨­å®š
 	ComboNo = pPC->GetRemoteWeapon();
 	sprintf(ComboString,"%d-%d-%d,",HIWORD(ComboNo),LOWORD(ComboNo)/0x80,LOWORD(ComboNo)%0x80);
 	ComboNo = SendMessage(GetDlgItem(hDlg2, IDC_COMBO12), CB_FINDSTRING, 0, (LPARAM)ComboString);
@@ -616,11 +616,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	char	ComboString[128];
 	int		i;
 
-	//	Šç‘•”õ@
+	//	é¡”è£…å‚™ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO2), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO2), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%sŠç.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sé¡”.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -630,11 +630,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO2), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	“ª‘•”õ@
+	//	é ­è£…å‚™ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO3), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO3), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s“ª.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sé ­.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -644,11 +644,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO3), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	“·‘•”õ@
+	//	èƒ´è£…å‚™ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO4), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO4), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s“·.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sèƒ´.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -658,11 +658,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO4), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	—¼è‘•”õ@
+	//	ä¸¡æ‰‹è£…å‚™ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO5), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO5), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s—¼è.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sä¸¡æ‰‹.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -672,11 +672,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO5), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	—¼‹r‘•”õ@
+	//	ä¸¡è„šè£…å‚™ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO6), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO6), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s—¼‹r.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sä¸¡è„š.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -686,11 +686,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO6), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	—¼‘«‘•”õ@
+	//	ä¸¡è¶³è£…å‚™ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO7), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO7), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s—¼‘«.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sä¸¡è¶³.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -700,11 +700,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO7), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	‰Eè•Ší@
+	//	å³æ‰‹æ­¦å™¨ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO10), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO10), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s•ŠíR.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sæ­¦å™¨R.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -714,11 +714,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO10), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	¶è•Ší@
+	//	å·¦æ‰‹æ­¦å™¨ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO11), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO11), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s•ŠíL.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sæ­¦å™¨L.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -728,11 +728,11 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 	}
 	fclose(fd);
 	SendMessage(GetDlgItem(in_hWnd, IDC_COMBO11), CB_SETCURSEL, (WPARAM)0, 0L);
-	//	‰“Šu•Ší@
+	//	é éš”æ­¦å™¨ã€€
 	while( SendMessage(GetDlgItem(in_hWnd, IDC_COMBO12), CB_GETCOUNT, 0, 0) != 0) {
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO12), CB_DELETESTRING, 0, 0);
 	}
-	sprintf(ListName,"%s\\List\\%s‰“Šu.lst",execDir,RaceName);
+	sprintf(ListName,"%s\\List\\%sé éš”.lst",execDir,RaceName);
 	if ((fd = fopen(ListName, "r")) < 0) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
@@ -746,7 +746,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 }
 
 
- //@í‘°A‘•”õ“™@ƒCƒxƒ“ƒgˆ—
+ //ã€€ç¨®æ—ã€è£…å‚™ç­‰ã€€ã‚¤ãƒ™ãƒ³ãƒˆå‡¦ç†
 LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM in_lParam )
 {
 	char	ComboString[128],RaceName[32];
@@ -761,11 +761,11 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 			g_mDispIdl = false;
             SendMessage(GetDlgItem(in_hWnd, IDC_CHECK2), BM_SETCHECK, (WPARAM)0, 0L);
 			g_mDispWire = false;
-			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETBUDDY, (WPARAM)GetDlgItem(in_hWnd, IDC_EDIT1), 0);     // ‘Î‰‚·‚éEditBoxw’è
-			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETRANGE, (WPARAM)1, (LPARAM)128);              // ”ÍˆÍw’è
-			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETPOS, 0, (LPARAM)1);       // ‰Šú’l‚Ìw’è
+			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETBUDDY, (WPARAM)GetDlgItem(in_hWnd, IDC_EDIT1), 0);     // å¯¾å¿œã™ã‚‹EditBoxæŒ‡å®š
+			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETRANGE, (WPARAM)1, (LPARAM)128);              // ç¯„å›²æŒ‡å®š
+			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETPOS, 0, (LPARAM)1);       // åˆæœŸå€¤ã®æŒ‡å®š
 			//SetDlgItemText(in_hWnd,IDC_EDIT2,(LPCTSTR)"0");
-			// PC ƒ‚[ƒVƒ‡ƒ“‰Šú’lƒZƒbƒg
+			// PC ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³åˆæœŸå€¤ã‚»ãƒƒãƒˆ
 			SendMessage(GetDlgItem(in_hWnd, IDC_COMBO8), CB_INSERTSTRING, (WPARAM)0, (LPARAM)"idl");
 			SendMessage(GetDlgItem(in_hWnd, IDC_COMBO8), CB_SETCURSEL, (WPARAM)0, 0L);
 			SendMessage(GetDlgItem(in_hWnd, IDC_COMBO9), CB_INSERTSTRING, (WPARAM)0, (LPARAM)"idl");
@@ -875,7 +875,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 			switch( LOWORD(in_wParam ) ) {
 				case IDC_COMBO1:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
-						//	í‘°‚Ìİ’è
+						//	ç¨®æ—ã®è¨­å®š
 						dum1 =SendMessage(GetDlgItem(in_hWnd, IDC_COMBO1), CB_GETCURSEL,(WPARAM)0,(LPARAM)0L);
 						g_mShlBoneNoR = g_mShlBoneTbl[dum1][0];
 						g_mShlBoneNoL = g_mShlBoneTbl[dum1][1];
@@ -908,7 +908,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO2:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
-						//	Šç‚Ìİ’è
+						//	é¡”ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO2), ComboString, sizeof(ComboString));
 						pPC->SetFace(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -919,7 +919,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO3:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
-						//	“ª‚Ìİ’è
+						//	é ­ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO3), ComboString, sizeof(ComboString));
 						pPC->SetHead(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -930,7 +930,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO4:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
-						//	“·‚Ìİ’è
+						//	èƒ´ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO4), ComboString, sizeof(ComboString));
 						pPC->SetBody(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -941,7 +941,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO5:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
-						//	è‚Ìİ’è
+						//	æ‰‹ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO5), ComboString, sizeof(ComboString));
 						pPC->SetHand(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -952,7 +952,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO6:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
-						//	‹r‚Ìİ’è
+						//	è„šã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO6), ComboString, sizeof(ComboString));
 						pPC->SetLegs(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -963,7 +963,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO7:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
- 						//	‘«‚Ìİ’è
+ 						//	è¶³ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO7), ComboString, sizeof(ComboString));
 						pPC->SetFoot(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -974,7 +974,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO8:
 					if (HIWORD(in_wParam) == CBN_SELCHANGE) {
-						//	PC‚Ìƒ‚[ƒVƒ‡ƒ“İ’è
+						//	PCã®ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO8), ComboString, sizeof(ComboString));
 						pPC->SetMotionName(ComboString);
 						pPC->LoadPCMotion();
@@ -982,7 +982,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO9:
 					if (HIWORD(in_wParam) == CBN_SELCHANGE) {
-						//	NPC‚Ìƒ‚[ƒVƒ‡ƒ“İ’è
+						//	NPCã®ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO9), ComboString, sizeof(ComboString));
 						pNPC->SetMotionName(ComboString);
 						pNPC->LoadNPCMotion();
@@ -990,7 +990,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO10:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
- 						//	‰Eè•Ší‚Ìİ’è
+ 						//	å³æ‰‹æ­¦å™¨ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO10), ComboString, sizeof(ComboString));
 						pPC->SetRightWeapon(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -1001,7 +1001,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO11:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
- 						//	¶è•Ší‚Ìİ’è
+ 						//	å·¦æ‰‹æ­¦å™¨ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO11), ComboString, sizeof(ComboString));
 						pPC->SetLeftWeapon(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -1012,7 +1012,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO12:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
- 						//	‰“Šu‚Ìİ’è
+ 						//	é éš”ã®è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO12), ComboString, sizeof(ComboString));
 						pPC->SetRemoteWeapon(ConvertStr2Dno2( ComboString ));
 						pPC->LoadPCParts();
@@ -1023,7 +1023,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					break;
 				case IDC_COMBO31:
 					if( HIWORD(in_wParam) == CBN_SELCHANGE ) {
- 						//	NPCƒf[ƒ^İ’è
+ 						//	NPCãƒ‡ãƒ¼ã‚¿è¨­å®š
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO31), ComboString, sizeof(ComboString));
 						pNPC->SetBody(ConvertStr2Dno2( ComboString ));
 						GetFileNameFromDir2(FileName,ComboString );
@@ -1212,7 +1212,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 
 //========================================================================
 //
-//		ƒƒbƒZ[ƒWˆ—
+//		ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸å‡¦ç†
 //
 //========================================================================
 LRESULT CALLBACK WinProc( HWND hWnd, UINT msg, UINT wParam, LONG lParam )
@@ -1223,7 +1223,7 @@ static float	Delta=0.,Step=0.2f;
 	D3DXMATRIX	mm,m1,m2;
 static bool		lDrag = false,rDrag = false;
 static short	x1=-1,y1=-1,x2,y2;
-   // ƒtƒ@ƒCƒ‹ƒI[ƒvƒ“ƒ_ƒCƒAƒƒOƒ{ƒbƒNƒX‚ÌƒeƒXƒg
+   // ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³ãƒ€ã‚¤ã‚¢ãƒ­ã‚°ãƒœãƒƒã‚¯ã‚¹ã®ãƒ†ã‚¹ãƒˆ
     OPENFILENAME sfn,sfx,sfbx;
     char szFPath[256],szFName[256],strmsg[256];
 	char szFPathx[256], szFNamex[256];
@@ -1239,7 +1239,7 @@ static short	x1=-1,y1=-1,x2,y2;
     sfn.nFilterIndex = 1;
     sfn.lpstrFileTitle = szFName;
     sfn.nMaxFileTitle = sizeof(szFName);
-	sfn.lpstrTitle = "MQOƒZ[ƒu";
+	sfn.lpstrTitle = "MQOã‚»ãƒ¼ãƒ–";
     sfn.lpstrInitialDir = NULL;
  
 	lstrcpy(szFPathx, "*.x");
@@ -1252,7 +1252,7 @@ static short	x1=-1,y1=-1,x2,y2;
 	sfx.nFilterIndex = 1;
 	sfx.lpstrFileTitle = szFNamex;
 	sfx.nMaxFileTitle = sizeof(szFNamex);
-	sfx.lpstrTitle = "Xƒtƒ@ƒCƒ‹@ƒZ[ƒu";
+	sfx.lpstrTitle = "Xãƒ•ã‚¡ã‚¤ãƒ«ã€€ã‚»ãƒ¼ãƒ–";
 	sfx.lpstrInitialDir = NULL;
 
 	lstrcpy(szFPathfbx, "*.fbx");
@@ -1265,12 +1265,12 @@ static short	x1=-1,y1=-1,x2,y2;
 	sfbx.nFilterIndex = 1;
 	sfbx.lpstrFileTitle = szFNamefbx;
 	sfbx.nMaxFileTitle = sizeof(szFNamefbx);
-	sfbx.lpstrTitle = "FBXƒtƒ@ƒCƒ‹@ƒZ[ƒu";
+	sfbx.lpstrTitle = "FBXãƒ•ã‚¡ã‚¤ãƒ«ã€€ã‚»ãƒ¼ãƒ–";
 	sfbx.lpstrInitialDir = NULL;
 	switch (msg)
 	{
 		//==============================================
-		//	I—¹
+		//	çµ‚äº†æ™‚
 		//==============================================
 		case WM_DESTROY:
 			PostQuitMessage( 0 );
@@ -1359,30 +1359,30 @@ static short	x1=-1,y1=-1,x2,y2;
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfn)) {
 						if (!pPC->saveMQO(szFPath, szFName)) {
-							wsprintf(strmsg, "ƒtƒ@ƒCƒ‹ %s@‚Í³‚µ‚­ˆ—‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½", szFPath);
-							MessageBox(NULL, strmsg, "ƒZ[ƒuƒtƒ@ƒCƒ‹ƒI[ƒvƒ“", MB_OK | MB_ICONINFORMATION);
+							wsprintf(strmsg, "ãƒ•ã‚¡ã‚¤ãƒ« %sã€€ã¯æ­£ã—ãå‡¦ç†ã§ãã¾ã›ã‚“ã§ã—ãŸ", szFPath);
+							MessageBox(NULL, strmsg, "ã‚»ãƒ¼ãƒ–ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³", MB_OK | MB_ICONINFORMATION);
 						}
 					}
 				}
 				else {
-					wsprintf(strmsg, "NPC‚Í–¢ƒTƒ|[ƒg‚Å‚·");
-					MessageBox(NULL, strmsg, "‚v‚`‚q‚m‚m‚h‚m‚f", MB_OK | MB_ICONINFORMATION);
+					wsprintf(strmsg, "NPCã¯æœªã‚µãƒãƒ¼ãƒˆã§ã™");
+					MessageBox(NULL, strmsg, "ï¼·ï¼¡ï¼²ï¼®ï¼®ï¼©ï¼®ï¼§", MB_OK | MB_ICONINFORMATION);
 				}
 			}
 			else if (LOWORD(wParam) == ID_MNU_SAVEFBX) {
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfbx)) {
 						if (!pPC->saveFBX(szFPathfbx, szFNamefbx)) {
-							wsprintf(strmsg, "ƒtƒ@ƒCƒ‹ %s@‚Í³‚µ‚­ˆ—‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½", szFPathfbx);
-							MessageBox(NULL, strmsg, "ƒZ[ƒuƒtƒ@ƒCƒ‹ƒI[ƒvƒ“", MB_OK | MB_ICONINFORMATION);
+							wsprintf(strmsg, "ãƒ•ã‚¡ã‚¤ãƒ« %sã€€ã¯æ­£ã—ãå‡¦ç†ã§ãã¾ã›ã‚“ã§ã—ãŸ", szFPathfbx);
+							MessageBox(NULL, strmsg, "ã‚»ãƒ¼ãƒ–ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³", MB_OK | MB_ICONINFORMATION);
 						}
 					}
 				}
 				else {
 					if (GetSaveFileName(&sfbx)) {
 						if (!pNPC->saveFBX(szFPathfbx, szFNamefbx)) {
-							wsprintf(strmsg, "ƒtƒ@ƒCƒ‹ %s@‚Í³‚µ‚­ˆ—‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½", szFPathfbx);
-							MessageBox(NULL, strmsg, "ƒZ[ƒuƒtƒ@ƒCƒ‹ƒI[ƒvƒ“", MB_OK | MB_ICONINFORMATION);
+							wsprintf(strmsg, "ãƒ•ã‚¡ã‚¤ãƒ« %sã€€ã¯æ­£ã—ãå‡¦ç†ã§ãã¾ã›ã‚“ã§ã—ãŸ", szFPathfbx);
+							MessageBox(NULL, strmsg, "ã‚»ãƒ¼ãƒ–ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³", MB_OK | MB_ICONINFORMATION);
 						}
 					}
 				}
@@ -1391,23 +1391,23 @@ static short	x1=-1,y1=-1,x2,y2;
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfx)) {
 						if (!pPC->saveX(szFPathx, szFNamex)) {
-							wsprintf(strmsg, "ƒtƒ@ƒCƒ‹ %s@‚Í³‚µ‚­ˆ—‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½", szFPathx);
-							MessageBox(NULL, strmsg, "ƒZ[ƒuƒtƒ@ƒCƒ‹ƒI[ƒvƒ“", MB_OK | MB_ICONINFORMATION);
+							wsprintf(strmsg, "ãƒ•ã‚¡ã‚¤ãƒ« %sã€€ã¯æ­£ã—ãå‡¦ç†ã§ãã¾ã›ã‚“ã§ã—ãŸ", szFPathx);
+							MessageBox(NULL, strmsg, "ã‚»ãƒ¼ãƒ–ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³", MB_OK | MB_ICONINFORMATION);
 						}
 					}
 				}
 				else {
 					if (GetSaveFileName(&sfx)) {
 						if (!pNPC->saveX(szFPathx, szFNamex)) {
-							wsprintf(strmsg, "ƒtƒ@ƒCƒ‹ %s@‚Í³‚µ‚­ˆ—‚Å‚«‚Ü‚¹‚ñ‚Å‚µ‚½", szFPathx);
-							MessageBox(NULL, strmsg, "ƒZ[ƒuƒtƒ@ƒCƒ‹ƒI[ƒvƒ“", MB_OK | MB_ICONINFORMATION);
+							wsprintf(strmsg, "ãƒ•ã‚¡ã‚¤ãƒ« %sã€€ã¯æ­£ã—ãå‡¦ç†ã§ãã¾ã›ã‚“ã§ã—ãŸ", szFPathx);
+							MessageBox(NULL, strmsg, "ã‚»ãƒ¼ãƒ–ãƒ•ã‚¡ã‚¤ãƒ«ã‚ªãƒ¼ãƒ—ãƒ³", MB_OK | MB_ICONINFORMATION);
 						}
 					}
 				}
 			} else if( LOWORD(wParam) == ID_MNU_INVENT ) {
 				ShowWindow( hDlg2,SW_SHOW );
 			} else if(LOWORD(wParam) == ID_MNU_EXIT) {
-				if( MessageBox(NULL, "–{“–‚ÉI—¹‚µ‚Ü‚·‚©H", "ƒvƒƒOƒ‰ƒ€I—¹", MB_YESNO | MB_ICONQUESTION ) == IDYES ) {
+				if( MessageBox(NULL, "æœ¬å½“ã«çµ‚äº†ã—ã¾ã™ã‹ï¼Ÿ", "ãƒ—ãƒ­ã‚°ãƒ©ãƒ çµ‚äº†", MB_YESNO | MB_ICONQUESTION ) == IDYES ) {
 					SendMessage(hWnd, WM_CLOSE, 0L, 0L);
 				}
 			}
