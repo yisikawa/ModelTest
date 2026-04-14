@@ -1832,27 +1832,23 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 		if (type == 1 && pMesh->m_FlipFlag == false) {
 			pMesh = (CMesh*)pMesh->Next; continue;
 		}
-		int			indx;
-		D3DXVECTOR4	pos, p1, p2;
-		D3DXMATRIX	mat;
+		int			indx1,indx2;
+		D3DXMATRIX	mat,mat1,mat2;
 		CUSTOMVERTEX* pV1, * pV2;
 		D3DXMatrixIdentity(&mat);
 		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
 		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
-			indx = pV1->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
-			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
-			indx = pV1->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
-			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
-			D3DXVECTOR3 v1(pV1->p.x, pV1->p.y, pV1->p.z);
-			D3DXVec3TransformCoord(&v1, &v1, &mat);
-			indx = pV2->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
-			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
-			D3DXVECTOR3 v2(pV2->p.x, pV2->p.y, pV2->p.z);
-			D3DXVec3TransformCoord(&v2, &v2, &mat);
-			pos.x = (v1.x * pV1->b1 + v2.x * pV2->b1) * 100.0f;
-			pos.y = (v1.y * pV1->b1 + v2.y * pV2->b1) * 100.0f;
-			pos.z = (v1.z * pV1->b1 + v2.z * pV2->b1) * 100.0f;
+			indx1 = pV1->indx; if (indx1 > pMesh->m_mBoneNum || indx1 < 0) indx1 = 0;
+			indx2 = pV2->indx; if (indx2 > pMesh->m_mBoneNum || indx2 < 0) indx2 = 0;
+			mat1 = m_Bones[pMesh->m_pBoneTbl[indx1]].m_mInvTrans * m_Bones[pMesh->m_pBoneTbl[indx1]].m_mWorld * pV1->b1;
+			mat2 = m_Bones[pMesh->m_pBoneTbl[indx2]].m_mInvTrans * m_Bones[pMesh->m_pBoneTbl[indx2]].m_mWorld * pV2->b1;
+			mat = mat1 + mat2;
+			D3DXVECTOR4 pos(pV1->p.x, pV1->p.y, pV1->p.z,1.0);
+			D3DXVec4Transform(&pos, &pos, &mat);
+			pos.x *= 100.0f;
+			pos.y *= 100.0f;
+			pos.z *= 100.0f;
 			fprintf(fd, "        %4.4f %4.4f %4.4f\n", pos.x, pos.y, pos.z);
 		}
 		(pMesh->m_lpVB2)->Unlock();
