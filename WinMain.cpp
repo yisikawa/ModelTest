@@ -1,4 +1,4 @@
-﻿//======================================================================
+//======================================================================
 // INCLUDE
 //======================================================================
 #define _CRT_SECURE_NO_WARNINGS
@@ -621,7 +621,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO2), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s顔.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -635,7 +635,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO3), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s頭.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -649,7 +649,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO4), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s胴.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -663,7 +663,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO5), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s両手.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -677,7 +677,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO6), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s両脚.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -691,7 +691,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO7), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s両足.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -705,7 +705,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO10), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s武器R.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -719,7 +719,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO11), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s武器L.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -733,7 +733,7 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 		SendMessage(GetDlgItem(in_hWnd, IDC_COMBO12), CB_DELETESTRING, 0, 0);
 	}
 	sprintf(ListName,"%s\\List\\%s遠隔.lst",execDir,RaceName);
-	if ((fd = fopen(ListName, "r")) < 0) return false;
+	if ((fd = fopen(ListName, "r")) == NULL) return false;
 	for( i=0 ; fgets(ComboString,sizeof(ComboString),fd) ; ) {
 		if( strlen(ComboString)<=1 ) continue;
 		sprintf(ListName,"1-%s",ComboString);
@@ -780,7 +780,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
  			SendMessage(GetDlgItem(in_hWnd, IDC_RADIO8), BM_SETCHECK, (WPARAM)1, 0L);
 			g_mPCFlag = true;
 			sprintf(ListName,"%s\\List\\NPC_ROM1.lst",execDir);
-			if ((fd = fopen(ListName, "r")) < 0) return false;
+			if ((fd = fopen(ListName, "r")) == NULL) return false;
 			strcpy(ComboString,"1-");
 			i=0;
 			while( fgets(&ComboString[2],sizeof(ComboString),fd) ) {
@@ -790,7 +790,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 			}
 			fclose(fd);
 			sprintf(ListName,"%s\\List\\NPC_ROM2.lst",execDir);
-			if ((fd = fopen(ListName, "r")) >= 0) {
+			if ((fd = fopen(ListName, "r")) != NULL) {
 				strcpy(ComboString,"2-");
 				while ( fgets(&ComboString[2],sizeof(ComboString),fd) ) {
 					if( ComboString[2]==';' ) continue;
