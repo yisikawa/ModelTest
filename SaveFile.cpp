@@ -1,4 +1,4 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #include "Dx.h"
 #include "Model.h"
 
@@ -712,15 +712,15 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		//strcpy(texName, pMaterial->m_Name);
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
-		sprintf(texpath, "%s%s.bmp", fpath, texName);
+		sprintf(texpath, "%s%s.png", fpath, texName);
 		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());
 		material->Ambient.Set(FbxDouble3(0., 0., 0.));
 		material->Diffuse.Set(FbxDouble3(1., 1., 1.));
 		material->Specular.Set(FbxDouble3(0., 0., 0.));
 		material->ShadingModel.Set("Phong");
 		FbxFileTexture* texture = FbxFileTexture::Create(fbxScene, ("Tex_" + string(texName)).c_str());
-		texture->SetFileName((string(texName)+".bmp").c_str()); // テクスチャファイルパス設定
-		texture->SetRelativeFileName((string(texName) + ".bmp").c_str());
+		texture->SetFileName((string(texName)+".png").c_str()); // テクスチャファイルパス設定
+		texture->SetRelativeFileName((string(texName) + ".png").c_str());
         texture->SetTextureUse(FbxTexture::eStandard);
         texture->SetMappingType(FbxTexture::eUV);
         texture->SetMaterialUse(FbxFileTexture::eModelMaterial); 
@@ -731,7 +731,7 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		// マテリアルをメッシュノードにアサイン
 		meshNode->AddMaterial(material);
 		//fbxScene->AddMaterial(material);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
+		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -995,8 +995,8 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 		//strcpy(texName, pMaterial->m_Name);
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
-		sprintf(texpath, "%s%s.bmp", fpath, texName);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
+		sprintf(texpath, "%s%s.png", fpath, texName);
+		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -1027,8 +1027,8 @@ bool CModel::outputMultiMeshX(char* FPath, char* FName, FILE* fd) {
 	while (pMaterial != NULL)
 	{
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		sprintf(texpath, "%s%s.bmp", fpath, texName);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
+		sprintf(texpath, "%s%s.png", fpath, texName);
+		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -1571,13 +1571,13 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 		PrintTab(fd, XTab); fprintf(fd, "1.000;1.000;1.000;;\n");
 		PrintTab(fd, XTab); fprintf(fd, "0.000;0.000;0.000;;\n");
 		PrintTab(fd, XTab); fprintf(fd, "TextureFilename {\n"); XTab++;
-		//		fprintf(fd, " \"%s%02d.bmp\";\n", FName, count);
+		//		fprintf(fd, " \"%s%02d.png\";\n", FName, count);
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		PrintTab(fd, XTab); fprintf(fd, "\"%s.bmp\";\n", texName);
+		PrintTab(fd, XTab); fprintf(fd, "\"%s.png\";\n", texName);
 		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
-		//sprintf(texpath, "%s%02d.bmp", FPath, count);
-		//D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
+		//sprintf(texpath, "%s%02d.png", FPath, count);
+		//D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
 	}
 	return true;
@@ -1689,9 +1689,9 @@ bool CModel::outputTex(char* FPath, char* FName, FILE* fd)
 	while (pMaterial != NULL)
 	{
 		fprintf(fd, "    \"texture%s%02d\" col(1.000 1.000 1.000 1.000)", FName, count);
-		fprintf(fd, " dif(1.000) amb(0.250) emi(0.250) spc(0.000) power(5.00) tex(\"%s%02d.bmp\")\n", FName, count);
-		sprintf(texpath, "%s%02d.bmp", FPath, count);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_BMP, pMaterial->m_pTexture, NULL);
+		fprintf(fd, " dif(1.000) amb(0.250) emi(0.250) spc(0.000) power(5.00) tex(\"%s%02d.png\")\n", FName, count);
+		sprintf(texpath, "%s%02d.png", FPath, count);
+		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
 		pMaterial = (CMaterial*)pMaterial->Next;
 		count++;
 	}
