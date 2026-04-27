@@ -5,9 +5,7 @@
 // INCLUDE
 //======================================================================
 #include <fbxsdk.h>
-#include <d3d9.h>
-#include <d3dx9.h>
-#include <d3dx9math.h>
+#include "DxMath.h"
 #include <vector>
 
 
@@ -111,7 +109,7 @@ typedef struct
 
 #pragma pack(pop)
 
-#define FVF_BLENDVERTEX		(D3DFVF_XYZB2 | D3DFVF_LASTBETA_UBYTE4 | D3DFVF_NORMAL | D3DFVF_TEX1)
+// FVF_BLENDVERTEX は DX11 では Input Layout で表現 (Dx.cpp InitShaders 参照)
 
 typedef struct
 {
@@ -219,7 +217,7 @@ protected:
 	short				m_DispLevel;
 
 public:
-	D3DPRIMITIVETYPE	m_PrimitiveType;
+	D3D11_PRIMITIVE_TOPOLOGY m_PrimitiveType;
 	int					m_texNo,m_NumElement,m_Level;
 	int					m_MinIdx,m_MaxIdx;
 	CMaterial			*m_pMaterial;
@@ -228,8 +226,8 @@ public:
 
 	virtual	void SetDispLevel( short DispLevel ) { m_DispLevel = DispLevel; }
 	virtual	int	 GetDispLevel( void ) { return (int)m_DispLevel; }
-	virtual void SetData( D3DPRIMITIVETYPE PrimitiveType,unsigned long index_start, unsigned long face_count );
-	virtual D3DPRIMITIVETYPE GetPrimitiveType( void );	
+	virtual void SetData( D3D11_PRIMITIVE_TOPOLOGY PrimitiveType, unsigned long index_start, unsigned long face_count );
+	virtual D3D11_PRIMITIVE_TOPOLOGY GetPrimitiveType( void );
 	virtual unsigned long GetIndexStart( void );
 	virtual unsigned long GetFaceCount( void );
 }
@@ -241,23 +239,26 @@ CStream, LPCStream;
 typedef class CMaterial : public CListBase
 {
 protected:
-//	IDirect3DTexture9	*m_pTexture;
-	D3DMATERIAL9		m_Material;
+	struct MaterialData {
+		float diffuse[4];
+		float ambient[4];
+		float specular[4];
+		float emissive[4];
+		float power;
+	}					m_Material;
 	unsigned long		m_IndexStart;
 	unsigned long		m_FaceCount;
 
 public:
 	char				m_Name[18];
-	IDirect3DTexture9	*m_pTexture;
+	ID3D11ShaderResourceView *m_pTexture;
 	CMaterial();
 	virtual ~CMaterial();
 	virtual void SetName( char *pName ) { strcpy(m_Name,pName); }
 	virtual char* GetName(void) { return m_Name; }
 	virtual void SetData( unsigned long index_start, unsigned long face_count );
-	virtual void SetMaterial( D3DMATERIAL9 *pMat );
-	virtual void SetTexture( IDirect3DTexture9 *pTex );
-	virtual D3DMATERIAL9 *GetMaterial( void );
-	virtual IDirect3DTexture9 *GetTexture( void );
+	virtual void SetTexture( ID3D11ShaderResourceView *pSRV );
+	virtual ID3D11ShaderResourceView *GetTexture( void );
 	virtual unsigned long GetIndexStart( void );
 	virtual unsigned long GetFaceCount( void );
 }
@@ -275,9 +276,6 @@ protected:
 	short					m_PartsNo;
 	short					m_DispLevel;
 	short					m_DispCheck;
-//	CBone					*m_pParent;
-	ID3DXBuffer				*m_pBoneTransforms;		// add
-
 
 	WORD					m_mBoneNum;
 	WORD					*m_pBoneTbl;
@@ -285,8 +283,11 @@ protected:
 
 public:
 	unsigned long			m_NumVertices,m_NumFaces,m_NumIndex,m_VBSize,m_IBSize,m_FVF;
-	LPDIRECT3DVERTEXBUFFER9 m_lpVB1,m_lpVB2;
-	LPDIRECT3DINDEXBUFFER9	m_lpIB;
+	ID3D11Buffer			*m_lpVB1, *m_lpVB2;
+	ID3D11Buffer			*m_lpIB;
+	CUSTOMVERTEX			*m_pCPUVertices;   // CPU側コピー VB1 (Conv1データ、ファイル出力用)
+	CUSTOMVERTEX			*m_pCPUVertices2;  // CPU側コピー VB2 (Conv2データ、ボーン2用)
+	WORD					*m_pCPUIndices;
 	int						m_Stnum;
 	CList					m_Streams;
 	char					m_Name[18];
@@ -439,9 +440,9 @@ typedef class CData : public CListBase
 {
 protected:
 	float						m_Time;
-	IDirect3DVertexDeclaration9	*m_VertexFormat;
+	ID3D11InputLayout			*m_pInputLayout;
 	unsigned long				m_VertexSize;
-	IDirect3DVertexShader9		*m_hVertexShader,*m_rVertexShader;
+	ID3D11VertexShader			*m_pVertexShader;
 
 	D3DXMATRIX					m_mRootTransform;
 
