@@ -10,8 +10,6 @@
 extern int Trim(char *s);
 extern bool convert_path(char *path, const char *target);
 extern void convert_texture_path(char *path);
-extern HRESULT CreateVB(LPDIRECT3DVERTEXBUFFER9 *lpVB, DWORD size, DWORD Usage, DWORD fvf);
-extern HRESULT CreateIB(LPDIRECT3DINDEXBUFFER9 *lpIB, DWORD size, DWORD Usage);
 
 // 他のファイルで定義されているグローバル変数の宣言
 extern bool g_mPCFlag;
@@ -35,7 +33,7 @@ CStream::CStream()
 	m_MinIdx		= 65535;
 	m_MaxIdx		= -65535;
 	m_pMaterial		= NULL;
-	m_PrimitiveType	= D3DPT_TRIANGLELIST;
+	m_PrimitiveType	= D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	m_IndexStart	= 0;
 	m_FaceCount		= 0;
 	m_DispLevel		= 0;
@@ -54,7 +52,7 @@ CStream::~CStream()
 //======================================================================
 //		インデックスデータ設定
 //======================================================================
-void CStream::SetData( D3DPRIMITIVETYPE PrimitiveType, unsigned long index_start, unsigned long face_count )
+void CStream::SetData( D3D11_PRIMITIVE_TOPOLOGY PrimitiveType, unsigned long index_start, unsigned long face_count )
 {
 	m_PrimitiveType	= PrimitiveType;
 	m_IndexStart	= index_start;
@@ -64,7 +62,7 @@ void CStream::SetData( D3DPRIMITIVETYPE PrimitiveType, unsigned long index_start
 //======================================================================
 //		プリミティブタイプ取得
 //======================================================================
-D3DPRIMITIVETYPE CStream::GetPrimitiveType( void )
+D3D11_PRIMITIVE_TOPOLOGY CStream::GetPrimitiveType( void )
 {
 	return m_PrimitiveType;
 }
@@ -102,14 +100,8 @@ CMaterial::CMaterial()
 	m_FaceCount		= 0;
 	memset( &m_Material, 0x00, sizeof(m_Material) );
 	memset(&m_Name, 0x00, sizeof(m_Name));
-	m_Material.Diffuse.a = 1.0f;
-	m_Material.Diffuse.r = 1.0f;
-	m_Material.Diffuse.g = 1.0f;
-	m_Material.Diffuse.b = 1.0f;
-	m_Material.Ambient.a = 1.0f;
-	m_Material.Ambient.r = 1.0f;
-	m_Material.Ambient.g = 1.0f;
-	m_Material.Ambient.b = 1.0f;
+	m_Material.diffuse[0] = m_Material.diffuse[1] = m_Material.diffuse[2] = m_Material.diffuse[3] = 1.0f;
+	m_Material.ambient[0] = m_Material.ambient[1] = m_Material.ambient[2] = m_Material.ambient[3] = 1.0f;
 }
 
 //======================================================================
@@ -130,20 +122,12 @@ void CMaterial::SetData( unsigned long index_start, unsigned long face_count )
 }
 
 //======================================================================
-//		マテリアルデータ設定
-//======================================================================
-void CMaterial::SetMaterial( D3DMATERIAL9 *pMat )
-{
-	m_Material = *pMat;
-}
-
-//======================================================================
 //		テクスチャ設定
 //======================================================================
-void CMaterial::SetTexture( IDirect3DTexture9 *pTex )
+void CMaterial::SetTexture( ID3D11ShaderResourceView *pSRV )
 {
 	SAFE_RELEASE( m_pTexture );
-	m_pTexture = pTex;
+	m_pTexture = pSRV;
 	if ( m_pTexture != NULL ) m_pTexture->AddRef();
 }
 
@@ -164,17 +148,9 @@ unsigned long CMaterial::GetFaceCount( void )
 }
 
 //======================================================================
-//		マテリアルデータ取得
-//======================================================================
-D3DMATERIAL9 *CMaterial::GetMaterial( void )
-{
-	return &m_Material;
-}
-
-//======================================================================
 //		テクスチャ取得
 //======================================================================
-IDirect3DTexture9 *CMaterial::GetTexture( void )
+ID3D11ShaderResourceView *CMaterial::GetTexture( void )
 {
 	return m_pTexture;
 }
@@ -189,7 +165,9 @@ CMesh::CMesh()
 {
 //	m_pParent				= NULL;
 	memset(&m_Name, 0x00, sizeof(m_Name));
-	m_pBoneTransforms		= NULL;
+	m_pCPUVertices			= NULL;
+	m_pCPUVertices2			= NULL;
+	m_pCPUIndices			= NULL;
 	m_pBoneTbl				= NULL;
 	m_pBoneTblNum			= NULL;
 	m_mBoneNum				= 0;
@@ -214,6 +192,9 @@ CMesh::~CMesh()
 	SAFE_RELEASE( m_lpIB );
 	SAFE_RELEASE( m_lpVB1 );
 	SAFE_RELEASE( m_lpVB2 );
+	SAFE_DELETES( m_pCPUVertices );
+	SAFE_DELETES( m_pCPUVertices2 );
+	SAFE_DELETES( m_pCPUIndices );
 	SAFE_DELETES( m_pBoneTbl );
 	SAFE_DELETES( m_pBoneTblNum );
 	m_Streams.Release();
@@ -779,14 +760,24 @@ HRESULT CMesh::LoadMesh
 	m_NumVertices = NumVertices;
 	m_NumFaces = NumFaces;
 	m_NumIndex = NumIndex;
-	m_FVF = FVF_BLENDVERTEX;
-	m_VBSize = D3DXGetFVFVertexSize(FVF_BLENDVERTEX)*NumVertices;
-	m_IBSize = NumIndex*sizeof(WORD);
-	hr = CreateIB( &m_lpIB, NumIndex*sizeof(WORD), 0 );
+	m_FVF    = 0; // DX11 では未使用（Input Layout で代替）
+	m_VBSize = (UINT)(sizeof(CUSTOMVERTEX) * NumVertices);
+	m_IBSize = (UINT)(NumIndex * sizeof(WORD));
+
+	// CPU 側コピー確保
+	SAFE_DELETES( m_pCPUVertices );
+	SAFE_DELETES( m_pCPUVertices2 );
+	SAFE_DELETES( m_pCPUIndices );
+	m_pCPUVertices  = new CUSTOMVERTEX[NumVertices]();
+	m_pCPUVertices2 = new CUSTOMVERTEX[NumVertices]();
+	m_pCPUIndices   = new WORD[NumIndex]();
+
+	// GPU バッファ生成（DYNAMIC: DynamicTransform でフレーム毎に上書き）
+	hr = CreateIB( &m_lpIB,  m_IBSize,  true );
 	if FAILED( hr ) return hr;
-	hr = CreateVB( &m_lpVB1, NumVertices*D3DXGetFVFVertexSize(FVF_BLENDVERTEX), 0, FVF_BLENDVERTEX );
+	hr = CreateVB( &m_lpVB1, m_VBSize,  true );
 	if FAILED( hr ) return hr;
-	hr = CreateVB( &m_lpVB2, NumVertices*D3DXGetFVFVertexSize(FVF_BLENDVERTEX), 0, FVF_BLENDVERTEX );
+	hr = CreateVB( &m_lpVB2, m_VBSize,  true );
 	if FAILED( hr ) return hr;
 	//=======================================================
 	//  ボーンテーブルの作成
@@ -797,56 +788,57 @@ HRESULT CMesh::LoadMesh
 	//==============================================================
 	// Mesh Data inport
 	//  Vertex Inport
-	CUSTOMVERTEX*	pV;
-	if( FAILED( m_lpVB1->Lock( 0,					// バッファの最初からデータを格納する。
-						m_VBSize,					// ロードするデータのサイズ。
-						(void**)&pV,				// 返されるインデックス データ。
-						D3DLOCK_DISCARD ) ) )       // デフォルト フラグをロックに送る。
-		return E_FAIL;
-	if( pcp->Type&0x7f ) {	// クロス
-		for( int i=0 ; i<NumVertices ; i++,pV++ ) {
-			if( pUVidx[i] <Num1 ) {
-				Conv1VertexC1(pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertexC, pUTemp[i], pVTemp[i], Flip);
-			} else {
-				Conv1VertexC2(pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertexC2, pUTemp[i], pVTemp[i], Flip);
+	// VB1: Conv1* data → m_pCPUVertices → GPU
+	{
+		CUSTOMVERTEX* pV = m_pCPUVertices;
+		if( pcp->Type&0x7f ) {	// クロス
+			for( int i=0 ; i<NumVertices ; i++,pV++ ) {
+				if( pUVidx[i] <Num1 ) {
+					Conv1VertexC1(pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertexC, pUTemp[i], pVTemp[i], Flip);
+				} else {
+					Conv1VertexC2(pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertexC2, pUTemp[i], pVTemp[i], Flip);
+				}
+			}
+		} else {
+			for( int i=0 ; i<NumVertices ; i++,pV++ ) {
+				if( pUVidx[i] < Num1 ) {
+					Conv1Vertex1( pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertex, pUTemp[i], pVTemp[i], Flip);
+				} else {
+					Conv1Vertex2( pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertex2, pUTemp[i], pVTemp[i], Flip);
+				}
 			}
 		}
-	} else {
-		for( int i=0 ; i<NumVertices ; i++,pV++ ) {
-			if( pUVidx[i] < Num1 ) {
-				Conv1Vertex1( pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertex, pUTemp[i], pVTemp[i], Flip);
-			} else {
-				Conv1Vertex2( pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertex2, pUTemp[i], pVTemp[i], Flip);
-			}
-		}
+		D3D11_MAPPED_SUBRESOURCE mapped = {};
+		if( FAILED( GetContext()->Map( m_lpVB1, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped ) ) )
+			return E_FAIL;
+		memcpy( mapped.pData, m_pCPUVertices, m_VBSize );
+		GetContext()->Unmap( m_lpVB1, 0 );
 	}
-	if( FAILED( hr = m_lpVB1->Unlock() ) ) {
-		return hr;
-	}
-	if( FAILED( m_lpVB2->Lock( 0,					// バッファの最初からデータを格納する。
-						m_VBSize,					// ロードするデータのサイズ。
-						(void**)&pV,				// 返されるインデックス データ。
-						D3DLOCK_DISCARD ) ) )       // デフォルト フラグをロックに送る。
-	return E_FAIL;
-	if( pcp->Type&0x7f ) {	// クロス
-		for( int i=0 ; i<NumVertices ; i++,pV++ ) {
-			if( pUVidx[i] <Num1 ) {
-				Conv2VertexC1(pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertexC, pUTemp[i], pVTemp[i], Flip);
-			} else {
-				Conv2VertexC2(pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertexC2, pUTemp[i], pVTemp[i], Flip);
+	// VB2: Conv2* data → m_pCPUVertices2 → GPU
+	{
+		CUSTOMVERTEX* pV = m_pCPUVertices2;
+		if( pcp->Type&0x7f ) {	// クロス
+			for( int i=0 ; i<NumVertices ; i++,pV++ ) {
+				if( pUVidx[i] <Num1 ) {
+					Conv2VertexC1(pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertexC, pUTemp[i], pVTemp[i], Flip);
+				} else {
+					Conv2VertexC2(pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertexC2, pUTemp[i], pVTemp[i], Flip);
+				}
+			}
+		} else {
+			for( int i=0 ; i<NumVertices ; i++,pV++ ) {
+				if( pUVidx[i] <Num1 ) {
+					Conv2Vertex1( pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertex, pUTemp[i], pVTemp[i], Flip);
+				} else {
+					Conv2Vertex2( pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertex2, pUTemp[i], pVTemp[i], Flip);
+				}
 			}
 		}
-	} else {
-		for( int i=0 ; i<NumVertices ; i++,pV++ ) {
-			if( pUVidx[i] <Num1 ) {
-				Conv2Vertex1( pV, pUVidx[i], pUVidx[i], pcp->Type, pBone, pVertex, pUTemp[i], pVTemp[i], Flip);
-			} else {
-				Conv2Vertex2( pV, pUVidx[i], pUVidx[i]-Num1, pcp->Type, pBone, pVertex2, pUTemp[i], pVTemp[i], Flip);
-			}
-		}
-	}
-	if( FAILED( hr = m_lpVB2->Unlock() ) ) {
-		return hr;
+		D3D11_MAPPED_SUBRESOURCE mapped = {};
+		if( FAILED( GetContext()->Map( m_lpVB2, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped ) ) )
+			return E_FAIL;
+		memcpy( mapped.pData, m_pCPUVertices2, m_VBSize );
+		GetContext()->Unmap( m_lpVB2, 0 );
 	}
 	SAFE_DELETES( pUVidx );
 	SAFE_DELETES( pUTemp );
@@ -855,16 +847,10 @@ HRESULT CMesh::LoadMesh
 	// Face Inport
 	char	  TexName[18];
 	CMaterial *pMaterial=NULL;
-    WORD*	pIndex;
+	WORD*	pIndex = m_pCPUIndices;   // CPU コピーに書き込む
 	int		count,texNo=0;
 	count = addpos	=	0;
 	pH8010			=	NULL;
-
- 	if( FAILED( m_lpIB->Lock( 0,                 // バッファの最初からデータを格納する。
-						m_IBSize, // ロードするデータのサイズ。
-						(void**)&pIndex, // 返されるインデックス データ。
-						D3DLOCK_DISCARD ) ) )            // デフォルト フラグをロックに送る。
-		return E_FAIL;
    while(addpos<pcp->PolyNum*2 ){
 		FaceType	= (int)*(WORD*)(pPoly+addpos  );
 		FaceNum		= (int)*(WORD*)(pPoly+addpos+2);
@@ -891,7 +877,7 @@ HRESULT CMesh::LoadMesh
 			CStream		*pStream;
 			pStream = new CStream;
 			m_Streams.InsertEnd( pStream );	m_Stnum++;
-			pStream->SetData(D3DPT_TRIANGLESTRIP,count,FaceNum);
+			pStream->SetData(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,count,FaceNum);
 			pStream->m_texNo = texNo;
 			pStream->m_pMaterial = pMaterial;
 			if( pH8010 ) {
@@ -923,7 +909,7 @@ HRESULT CMesh::LoadMesh
 			CStream		*pStream;
 			pStream = new CStream;
 			m_Streams.InsertEnd( pStream );	m_Stnum++;
-			pStream->SetData(D3DPT_TRIANGLELIST,count,FaceNum);
+			pStream->SetData(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST,count,FaceNum);
 			pStream->m_texNo = texNo;
 			pStream->m_pMaterial = pMaterial;
 			if( pH8010 ) {
@@ -945,8 +931,12 @@ HRESULT CMesh::LoadMesh
 		}
         break;
 	} 
- 	if( FAILED( hr = m_lpIB->Unlock() ) ) {
-		return hr;
+	{
+		D3D11_MAPPED_SUBRESOURCE mapped = {};
+		if( FAILED( hr = GetContext()->Map( m_lpIB, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped ) ) )
+			return hr;
+		memcpy( mapped.pData, m_pCPUIndices, m_IBSize );
+		GetContext()->Unmap( m_lpIB, 0 );
 	}
 	return hr;
 }
@@ -986,9 +976,7 @@ int	 CMesh::cntNumFace(void){
 // print out Vertex data
 bool CMesh::prtVertex(FILE *fd){
 	bool notfirst = false;
-	CUSTOMVERTEX	*pV;
-
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+	CUSTOMVERTEX *pV = m_pCPUVertices;
 
 	//頂点数出力
 	fprintf(fd, " %d;\n", m_NumVertices);
@@ -1010,7 +998,6 @@ bool CMesh::prtVertex(FILE *fd){
 		fprintf(fd, "        %6.6f;%6.6f;%6.6f;", pV->p.x, pV->p.y, pV->p.z);
 	}
 	fprintf(fd, ";\n");
-	m_lpVB1->Unlock();
 	return true;
 }
 // print out Face data
@@ -1025,8 +1012,8 @@ bool CMesh::prtFace(FILE *fd) {
 	fprintf(fd, " %d;\n", m_NumFaces);
 	// 面データ出力
 	notfirst = false;
-	m_lpIB->Lock(0, m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+	pIndex = m_pCPUIndices;
+	pV     = m_pCPUVertices;
 	CStream *pStream = (CStream*)m_Streams.Top();
 	while (pStream != NULL) {
 		int	dispLevel = pStream->GetDispLevel();
@@ -1035,7 +1022,7 @@ bool CMesh::prtFace(FILE *fd) {
 			continue;
 		}
 		pI = pIndex + pStream->GetIndexStart();
-		if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+		if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 			i1 = *pI++; i2 = *pI++;
 			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 				i3 = *pI++;
@@ -1063,7 +1050,7 @@ bool CMesh::prtFace(FILE *fd) {
 				i1 = i2; i2 = i3;
 			}
 		}
-		else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+		else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 				i1 = *pI++; i2 = *pI++; i3 = *pI++;
 				if (m_FlipFlag) {
@@ -1082,17 +1069,13 @@ bool CMesh::prtFace(FILE *fd) {
 		pStream = (CStream*)pStream->Next;
 	}
 	fprintf(fd, "  ;\n");
-	m_lpVB1->Unlock();
-	m_lpIB->Unlock();
 	return true;
 }
 
 // print out Normal data
 bool CMesh::prtNormal(FILE *fd){
 	bool notfirst = false;
-	CUSTOMVERTEX	*pV;
-
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+	CUSTOMVERTEX *pV = m_pCPUVertices;
 
 	//頂点数出力
 	fprintf(fd, " %d;\n", m_NumVertices);
@@ -1106,7 +1089,6 @@ bool CMesh::prtNormal(FILE *fd){
 		fprintf(fd, "        %6.6f;%6.6f;%6.6f;", pV->n.x, pV->n.y, pV->n.z);
 	}
 	fprintf(fd, ";\n");
-	m_lpVB1->Unlock();
 	return true;
 }
 
@@ -1120,7 +1102,7 @@ bool CMesh::prtTexCoord(FILE *fd){
 	fprintf(fd, " %d;\n", m_NumVertices);
 	// テクスチャ座標データ出力
 	notfirst = false;
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+	pV = m_pCPUVertices;
 	for (unsigned int i = 0; i<m_NumVertices; i++, pV++) {
 		if (notfirst)
 			fprintf(fd, ",\n");
@@ -1137,7 +1119,6 @@ bool CMesh::prtTexCoord(FILE *fd){
 	}
 	fprintf(fd, ";\n");
 	fprintf(fd, "      }\n");
-	m_lpVB1->Unlock();
 	return true;
 }
 
@@ -1159,8 +1140,8 @@ bool CMesh::prtMaterialList(FILE *fd) {
 	CUSTOMVERTEX	*pV;
 	int dispCheck = GetDispCheck();
 
-	m_lpIB->Lock(0, m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+	pIndex = m_pCPUIndices;
+	pV     = m_pCPUVertices;
 	CStream *pStream = (CStream*)m_Streams.Top();
 	while (pStream != NULL) {
 		int	dispLevel = pStream->GetDispLevel();
@@ -1169,7 +1150,7 @@ bool CMesh::prtMaterialList(FILE *fd) {
 			continue;
 		}
 		pI = pIndex + pStream->GetIndexStart();
-		if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+		if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 			i1 = *pI++; i2 = *pI++;
 			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 				i3 = *pI++;
@@ -1198,7 +1179,7 @@ bool CMesh::prtMaterialList(FILE *fd) {
 				i1 = i2; i2 = i3;
 			}
 		}
-		else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+		else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 				i1 = *pI++; i2 = *pI++; i3 = *pI++;
 				if (m_FlipFlag) {
@@ -1219,8 +1200,6 @@ bool CMesh::prtMaterialList(FILE *fd) {
 		pStream = (CStream*)pStream->Next;
 	}
 	fprintf(fd, ";\n");
-	m_lpVB1->Unlock();
-	m_lpIB->Unlock();
 	return true;
 }
 // print out material 
@@ -1244,9 +1223,7 @@ bool CMesh::prtMaterial(char *FPath, char *FName, FILE *fd) {
 int CMesh::cntBone2Ver(int boneNo) {
 	int	 boneCnt = 0;
 
-	CUSTOMVERTEX	*pV1, *pV2;
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-	m_lpVB2->Lock(0, m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
+	CUSTOMVERTEX *pV1 = m_pCPUVertices, *pV2 = m_pCPUVertices2;
 	for (unsigned int i = 0; i<m_NumVertices; i++, pV1++, pV2++) {
 		if (pV1->b1>0.f && m_pBoneTbl[pV1->indx] == boneNo) {
 			boneCnt++;
@@ -1255,17 +1232,13 @@ int CMesh::cntBone2Ver(int boneNo) {
 			boneCnt++;
 		}
 	}
-	m_lpVB1->Unlock();
-	m_lpVB2->Unlock();
 	return boneCnt;
 }
 
 bool CMesh::prtBone2VerNo(FILE *fd, int boneNo) {
 	bool notfirst = false;
-	CUSTOMVERTEX	*pV1, *pV2;
+	CUSTOMVERTEX *pV1 = m_pCPUVertices, *pV2 = m_pCPUVertices2;
 
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-	m_lpVB2->Lock(0, m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
 	for (unsigned int i = 0; i<m_NumVertices; i++, pV1++, pV2++) {
 		if (pV1->b1>0.f && m_pBoneTbl[pV1->indx] == boneNo) {
 			if (notfirst)
@@ -1283,17 +1256,13 @@ bool CMesh::prtBone2VerNo(FILE *fd, int boneNo) {
 		}
 	}
 	fprintf(fd, ";\n");
-	m_lpVB1->Unlock();
-	m_lpVB2->Unlock();
 	return true;
 }
 
 bool CMesh::prtBone2VerWeight(FILE *fd, int boneNo) {
 	bool notfirst = false;
-	CUSTOMVERTEX	*pV1, *pV2;
+	CUSTOMVERTEX *pV1 = m_pCPUVertices, *pV2 = m_pCPUVertices2;
 
-	m_lpVB1->Lock(0, m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-	m_lpVB2->Lock(0, m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
 	for (unsigned int i = 0; i<m_NumVertices; i++, pV1++, pV2++) {
 		if (pV1->b1>0.f && m_pBoneTbl[pV1->indx] == boneNo) {
 			if (notfirst)
@@ -1311,7 +1280,5 @@ bool CMesh::prtBone2VerWeight(FILE *fd, int boneNo) {
 		}
 	}
 	fprintf(fd, ";\n");
-	m_lpVB1->Unlock();
-	m_lpVB2->Unlock();
 	return true;
 }

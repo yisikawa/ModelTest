@@ -6,14 +6,13 @@
 #include <string>
 #include <stdio.h>
 #include "Dx.h"
+#include "Render.h"
 #include "Model.h"
 //Function
 DWORD _GetFileNameFromIDsub(DWORD dwV,DWORD dwID);
 BOOL GetFileNameFromDno(LPSTR filename,DWORD dwID);
 BOOL GetFileNameFromDir(LPSTR filename,char *DataName );
 DWORD	ConvertStr2Dno( char* DataName );
-HRESULT CreateVB( LPDIRECT3DVERTEXBUFFER9 *lpVB, DWORD size, DWORD Usage, DWORD fvf );
-HRESULT CreateIB( LPDIRECT3DINDEXBUFFER9 *lpIB, DWORD size, DWORD Usage );
 // DEFINE
 #define SAFE_RELEASE(p)		if ( (p) != NULL ) { (p)->Release(); (p) = NULL; }
 #define SAFE_DELETES(p)		if ( (p) != NULL ) { delete [] (p); (p) = NULL; }
@@ -30,7 +29,7 @@ extern	CNPC		*pNPC;
 extern	bool		g_mPCFlag;
 		int			g_mPCMotion = 0; // 0:default 1:attack 2:emotion 3:WS
 extern	BOOL		g_mIsUseSoftware;
-extern	D3DLIGHT9	g_mLight,g_mLightbase;
+extern	LIGHTDATA	g_mLight,g_mLightbase;
 extern	D3DXMATRIX	g_mProjection, g_mView;
 extern	D3DXVECTOR3	g_mAt,g_mEye,g_mUp;
 extern	float		g_mTime;
@@ -155,19 +154,6 @@ strcpynosp
 	if( *p != '\0' ) *p='\0';
 	return (char*)string1;
 }//strcpynosp
-//======================================================================
-// 頂点フォーマット
-//======================================================================
-
-D3DVERTEXELEMENT9 VS0Formats[] =
-{
-	// First stream is first mesh
-	{ 0, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
-	{ 0, 16, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0 },
-	{ 0, 20, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0 },
-	{ 0, 32, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
-	D3DDECL_END()
-};
 
 //------------------------------------------------------------------------------------------//
 //									CListBase												//
@@ -454,9 +440,9 @@ long CList::Size( void )
 CData::CData()
 {
 	m_Time					= 0;
-	m_VertexFormat			= NULL;
+	m_pInputLayout			= NULL;
 	m_VertexSize			= 0;
-	m_hVertexShader			= NULL;
+	m_pVertexShader			= NULL;
 	m_Materials.Init();
 
 	D3DXMatrixIdentity( &m_mRootTransform );
@@ -549,45 +535,55 @@ HRESULT CData::LoadTextureFromFile( char *FileName  )
 			char	TexName[18];
 			strncpy(TexName,pdat+pos+16+1,16);TexName[16]='\0';
 			pMaterial->SetName(TexName);
-			LPDIRECT3DTEXTURE9 pTex;
-			UINT xx,yy;
-			xx = *(UINT*)(pdat+pos+33+4);
-			yy = *(UINT*)(pdat+pos+33+8);
-			D3DLOCKED_RECT rc;
-			if( *(DWORD*)(pdat+pos+33+0x28) == 'DXT3' ){
-				hr = GetDevice()->CreateTexture(xx,yy,0,0 ,D3DFMT_DXT3,D3DPOOL_MANAGED,&pTex,NULL);
-				if( hr!=D3D_OK ) break;
-				hr = pTex->LockRect(0,&rc,NULL,0);
-				if(hr==D3D_OK){
-				  CopyMemory(rc.pBits,pdat+pos+33+0x28+12,(xx/4) * (yy/4) * 16 );
-				  pTex->UnlockRect(0);
-				}
-			} else if( *(DWORD*)(pdat+pos+33+0x28) == 'DXT1' ){
-				hr = GetDevice()->CreateTexture(xx,yy,0,0,D3DFMT_DXT1,D3DPOOL_MANAGED,&pTex,NULL);
-				if( hr!=D3D_OK ) break;
-				hr = pTex->LockRect(0,&rc,NULL,0);
-				if(hr==D3D_OK){
-				  CopyMemory(rc.pBits,pdat+pos+33+0x28+12,(xx/4) * (yy/4) * 8  );
-				  pTex->UnlockRect(0);
-				}
+			UINT xx = *(UINT*)(pdat+pos+33+4);
+			UINT yy = *(UINT*)(pdat+pos+33+8);
+			DWORD fourCC = *(DWORD*)(pdat+pos+33+0x28);
+
+			D3D11_TEXTURE2D_DESC texDesc = {};
+			texDesc.Width            = xx;
+			texDesc.Height           = yy;
+			texDesc.MipLevels        = 1;
+			texDesc.ArraySize        = 1;
+			texDesc.SampleDesc.Count = 1;
+			texDesc.Usage            = D3D11_USAGE_DEFAULT;
+			texDesc.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
+
+			D3D11_SUBRESOURCE_DATA initData = {};
+			BYTE *pTempBuf = nullptr;
+
+			if( fourCC == 'DXT3' ){
+				texDesc.Format           = DXGI_FORMAT_BC2_UNORM;
+				initData.pSysMem         = pdat+pos+33+0x28+12;
+				initData.SysMemPitch     = ((xx+3)/4) * 16;
+			} else if( fourCC == 'DXT1' ){
+				texDesc.Format           = DXGI_FORMAT_BC1_UNORM;
+				initData.pSysMem         = pdat+pos+33+0x28+12;
+				initData.SysMemPitch     = ((xx+3)/4) * 8;
 			} else {
-				hr = GetDevice()->CreateTexture(xx,yy,0,0,D3DFMT_A8R8G8B8,D3DPOOL_MANAGED,&pTex,NULL);
-				if( hr!=D3D_OK ) return NULL;
-				hr = pTex->LockRect(0,&rc,NULL,0);
-				if(hr==D3D_OK){
-					for( DWORD jy=0; jy<yy; jy++ ){
-						for( DWORD jx=0; jx<xx; jx++ ){
-							DWORD *pp  = (DWORD *)rc.pBits;
-							BYTE  *idx = (BYTE  *)(pdat+pos+33+0x28+0x400);
-							DWORD *pal = (DWORD *)(pdat+pos+33+0x28);
-							pp[(yy-jy-1)*xx+jx] = pal[idx[jy*xx+jx]];
-						}
-					}
-				}
-				pTex->UnlockRect(0);
+				texDesc.Format           = DXGI_FORMAT_B8G8R8A8_UNORM;
+				pTempBuf = new BYTE[xx * yy * 4];
+				BYTE  *idx = (BYTE* )(pdat+pos+33+0x28+0x400);
+				DWORD *pal = (DWORD*)(pdat+pos+33+0x28);
+				DWORD *pp  = (DWORD*)pTempBuf;
+				for( DWORD jy=0; jy<yy; jy++ )
+					for( DWORD jx=0; jx<xx; jx++ )
+						pp[(yy-jy-1)*xx+jx] = pal[idx[jy*xx+jx]];
+				initData.pSysMem         = pTempBuf;
+				initData.SysMemPitch     = xx * 4;
 			}
-			pMaterial->SetTexture( pTex );
-			SAFE_RELEASE( pTex );
+
+			ID3D11Texture2D *pTex2D = nullptr;
+			hr = GetDevice()->CreateTexture2D( &texDesc, &initData, &pTex2D );
+			delete[] pTempBuf;
+			if( FAILED(hr) ) break;
+
+			ID3D11ShaderResourceView *pSRV = nullptr;
+			hr = GetDevice()->CreateShaderResourceView( pTex2D, nullptr, &pSRV );
+			pTex2D->Release();
+			if( FAILED(hr) ) break;
+
+			pMaterial->SetTexture( pSRV );
+			pSRV->Release();
 			break;
 		}
 		pos+=next;
