@@ -24,6 +24,8 @@ struct CBPerFrame
 	XMFLOAT4   lightDir;      // ワールド空間ライト方向（正規化済み、光源へ向かう方向）
 	XMFLOAT4   lightDiffuse;
 	XMFLOAT4   lightAmbient;
+	XMFLOAT4   lightSpecular;
+	XMFLOAT4   eyePos;        // ワールド空間カメラ位置
 };
 
 struct CBPerObject

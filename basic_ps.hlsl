@@ -1,20 +1,47 @@
-// 基本ピクセルシェーダー
+// 基本ピクセルシェーダー（Phong反射モデル）
 
 Texture2D    g_texDiffuse : register(t0);
 SamplerState g_samLinear  : register(s0);
 
+cbuffer CBPerFrame : register(b0)
+{
+    row_major float4x4 matView;
+    row_major float4x4 matProj;
+    float4             lightDir;
+    float4             lightDiffuse;
+    float4             lightAmbient;
+    float4             lightSpecular;
+    float4             eyePos;
+};
+
+static const float shininess = 32.0f;
+
 struct PS_INPUT
 {
-    float4 position : SV_POSITION;
-    float2 texcoord : TEXCOORD;
-    float4 color    : COLOR;
+    float4 position    : SV_POSITION;
+    float2 texcoord    : TEXCOORD0;
+    float3 worldPos    : TEXCOORD1;
+    float3 worldNormal : TEXCOORD2;
 };
 
 float4 main(PS_INPUT input) : SV_TARGET
 {
-    float4 tex = g_texDiffuse.Sample(g_samLinear, input.texcoord);
+    float3 N = normalize(input.worldNormal);
+    float3 L = normalize(-lightDir.xyz);
+    float3 V = normalize(eyePos.xyz - input.worldPos);
+    float3 R = reflect(-L, N);
 
-    // テクスチャがない場合（サンプラーが白を返す）はライティングカラーをそのまま使用
-    float3 finalColor = tex.rgb * input.color.rgb;
+    float  diffuse  = saturate(dot(N, L));
+    float  specular = pow(saturate(dot(R, V)), shininess);
+
+    float3 lighting = lightAmbient.rgb
+                    + diffuse  * lightDiffuse.rgb
+                    + specular * lightSpecular.rgb;
+
+    float4 tex = g_texDiffuse.Sample(g_samLinear, input.texcoord);
+    if (all(tex == 0.0f))
+        tex = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    clip(tex.a - 0.5f);
+    float3 finalColor = tex.rgb * lighting;
     return float4(finalColor, tex.a);
 }
