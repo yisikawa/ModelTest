@@ -1,6 +1,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "Dx.h"
+#include "Render.h"
 #include "Model.h"
+#include <d3dx11.h>
 
 #include <iostream>
 #include <sstream>
@@ -47,8 +49,8 @@ void CModel::OptimizeVertices(bool enable) {
 	CMesh* pMesh = (CMesh*)m_Meshs.Top();
 	while (pMesh != NULL) {
 		CUSTOMVERTEX* pV1, * pV2;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
+		pV1 = pMesh->m_pCPUVertices;
+		pV2 = pMesh->m_pCPUVertices2;
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++, originalNo++) {
 			D3DXVECTOR3 vert(pV1->p.x, pV1->p.y, pV1->p.z);
 
@@ -116,8 +118,6 @@ void CModel::OptimizeVertices(bool enable) {
 			}
 			m_vertexRemap[originalNo] = foundIndex;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpVB2)->Unlock();
 		pMesh = (CMesh*)pMesh->Next;
 	}
 
@@ -129,7 +129,7 @@ void CModel::OptimizeVertices(bool enable) {
 		WORD* pI, * pIndex;
 		int i1, i2, i3, t1, t2, t3;
 		int dispCheck = pMesh->GetDispCheck();
-		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
+		pIndex = pMesh->m_pCPUIndices;
 		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
 		while (pStream != NULL) {
 			int dispLevel = pStream->GetDispLevel();
@@ -138,7 +138,7 @@ void CModel::OptimizeVertices(bool enable) {
 				continue;
 			}
 			pI = pIndex + pStream->GetIndexStart();
-			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+			if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 				i1 = *pI++; i2 = *pI++;
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
@@ -165,7 +165,7 @@ void CModel::OptimizeVertices(bool enable) {
 					}
 					i1 = i2; i2 = i3;
 				}
-			} else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+			} else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
@@ -186,7 +186,6 @@ void CModel::OptimizeVertices(bool enable) {
 			}
 			pStream = (CStream*)pStream->Next;
 		}
-		(pMesh->m_lpIB)->Unlock();
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
@@ -241,8 +240,8 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 		int				i1, i2, i3, t1, t2, t3;
 		CUSTOMVERTEX* pV;
 		int dispCheck = pMesh->GetDispCheck();
-		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+		pIndex = pMesh->m_pCPUIndices;
+		pV = pMesh->m_pCPUVertices;
 		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
 		while (pStream != NULL) {
 			int	dispLevel = pStream->GetDispLevel();
@@ -251,7 +250,7 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 				continue;
 			}
 			pI = pIndex + pStream->GetIndexStart();
-			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+			if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 				i1 = *pI++; i2 = *pI++;
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
@@ -281,7 +280,7 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 					i1 = i2; i2 = i3;
 				}
 			}
-			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+			else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) {
@@ -302,8 +301,6 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 			fCnt += pStream->GetFaceCount();
 			pStream = (CStream*)pStream->Next;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpIB)->Unlock();
 		//if (pMesh->Next != NULL) fprintf(fd, ",\n");
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
@@ -443,8 +440,8 @@ bool CModel::SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo) {
 	std::vector<bool> addedMap(m_vertexRemap.size(), false);
 	while (pMesh != NULL) {
 		CUSTOMVERTEX* pV1, * pV2;
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
+		pV1 = pMesh->m_pCPUVertices;
+		pV2 = pMesh->m_pCPUVertices2;
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
 			int uniqueInd = m_vertexRemap[i + vCnt];
 			if (addedMap[uniqueInd]) continue;
@@ -462,8 +459,6 @@ bool CModel::SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo) {
 				addedMap[uniqueInd] = true;
 			}
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpVB2)->Unlock();
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
@@ -712,15 +707,15 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		//strcpy(texName, pMaterial->m_Name);
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
-		sprintf(texpath, "%s%s.png", fpath, texName);
+		sprintf(texpath, "%s%s.dds", fpath, texName);
 		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());
 		material->Ambient.Set(FbxDouble3(0., 0., 0.));
 		material->Diffuse.Set(FbxDouble3(1., 1., 1.));
 		material->Specular.Set(FbxDouble3(0., 0., 0.));
 		material->ShadingModel.Set("Phong");
 		FbxFileTexture* texture = FbxFileTexture::Create(fbxScene, ("Tex_" + string(texName)).c_str());
-		texture->SetFileName((string(texName)+".png").c_str()); // テクスチャファイルパス設定
-		texture->SetRelativeFileName((string(texName) + ".png").c_str());
+		texture->SetFileName((string(texName)+".dds").c_str()); // テクスチャファイルパス設定
+		texture->SetRelativeFileName((string(texName) + ".dds").c_str());
         texture->SetTextureUse(FbxTexture::eStandard);
         texture->SetMappingType(FbxTexture::eUV);
         texture->SetMaterialUse(FbxFileTexture::eModelMaterial); 
@@ -731,7 +726,7 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		// マテリアルをメッシュノードにアサイン
 		meshNode->AddMaterial(material);
 		//fbxScene->AddMaterial(material);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -995,8 +990,8 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 		//strcpy(texName, pMaterial->m_Name);
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
-		sprintf(texpath, "%s%s.png", fpath, texName);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
+		sprintf(texpath, "%s%s.dds", fpath, texName);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -1027,8 +1022,8 @@ bool CModel::outputMultiMeshX(char* FPath, char* FName, FILE* fd) {
 	while (pMaterial != NULL)
 	{
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		sprintf(texpath, "%s%s.png", fpath, texName);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
+		sprintf(texpath, "%s%s.dds", fpath, texName);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -1290,8 +1285,8 @@ bool CModel::outputFace(FILE* fd) {
 		int				i1, i2, i3, t1, t2, t3;
 		CUSTOMVERTEX* pV;
 		int dispCheck = pMesh->GetDispCheck();
-		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+		pIndex = pMesh->m_pCPUIndices;
+		pV = pMesh->m_pCPUVertices;
 		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
 		while (pStream != NULL) {
 			int	dispLevel = pStream->GetDispLevel();
@@ -1300,7 +1295,7 @@ bool CModel::outputFace(FILE* fd) {
 				continue;
 			}
 			pI = pIndex + pStream->GetIndexStart();
-			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+			if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 				i1 = *pI++; i2 = *pI++;
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
@@ -1328,7 +1323,7 @@ bool CModel::outputFace(FILE* fd) {
 					i1 = i2; i2 = i3;
 				}
 			}
-			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+			else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) {
@@ -1347,8 +1342,6 @@ bool CModel::outputFace(FILE* fd) {
 			fCnt += pStream->GetFaceCount();
 			pStream = (CStream*)pStream->Next;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpIB)->Unlock();
 		//if (pMesh->Next != NULL) fprintf(fd, ",\n");
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
@@ -1387,8 +1380,8 @@ bool CModel::outputNormalFace(FILE* fd) {
 		int				i1, i2, i3, t1, t2, t3;
 		CUSTOMVERTEX* pV;
 		int dispCheck = pMesh->GetDispCheck();
-		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+		pIndex = pMesh->m_pCPUIndices;
+		pV = pMesh->m_pCPUVertices;
 		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
 		while (pStream != NULL) {
 			int	dispLevel = pStream->GetDispLevel();
@@ -1397,7 +1390,7 @@ bool CModel::outputNormalFace(FILE* fd) {
 				continue;
 			}
 			pI = pIndex + pStream->GetIndexStart();
-			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+			if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 				i1 = *pI++; i2 = *pI++;
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
@@ -1411,7 +1404,7 @@ bool CModel::outputNormalFace(FILE* fd) {
 					i1 = i2; i2 = i3;
 				}
 			}
-			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+			else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; } else { t1 = i3; t2 = i2; t3 = i1; }
@@ -1422,8 +1415,6 @@ bool CModel::outputNormalFace(FILE* fd) {
 			fCnt += pStream->GetFaceCount();
 			pStream = (CStream*)pStream->Next;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpIB)->Unlock();
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
@@ -1491,8 +1482,8 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 		int				i1, i2, i3, t1, t2, t3;
 		CUSTOMVERTEX* pV;
 		int dispCheck = pMesh->GetDispCheck();
-		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+		pIndex = pMesh->m_pCPUIndices;
+		pV = pMesh->m_pCPUVertices;
 		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
 		while (pStream != NULL) {
 			int	dispLevel = pStream->GetDispLevel();
@@ -1501,7 +1492,7 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 				continue;
 			}
 			pI = pIndex + pStream->GetIndexStart();
-			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+			if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 				i1 = *pI++; i2 = *pI++;
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
@@ -1529,7 +1520,7 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 					i1 = i2; i2 = i3;
 				}
 			}
-			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+			else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) {
@@ -1548,8 +1539,6 @@ bool CModel::outputMaterialList(char* FPath, char* FName, FILE* fd) {
 			fCnt += pStream->GetFaceCount();
 			pStream = (CStream*)pStream->Next;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpIB)->Unlock();
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
@@ -1573,7 +1562,7 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 		PrintTab(fd, XTab); fprintf(fd, "TextureFilename {\n"); XTab++;
 		//		fprintf(fd, " \"%s%02d.png\";\n", FName, count);
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		PrintTab(fd, XTab); fprintf(fd, "\"%s.png\";\n", texName);
+		PrintTab(fd, XTab); fprintf(fd, "\"%s.dds\";\n", texName);
 		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 		//sprintf(texpath, "%s%02d.png", FPath, count);
@@ -1689,9 +1678,9 @@ bool CModel::outputTex(char* FPath, char* FName, FILE* fd)
 	while (pMaterial != NULL)
 	{
 		fprintf(fd, "    \"texture%s%02d\" col(1.000 1.000 1.000 1.000)", FName, count);
-		fprintf(fd, " dif(1.000) amb(0.250) emi(0.250) spc(0.000) power(5.00) tex(\"%s%02d.png\")\n", FName, count);
-		sprintf(texpath, "%s%02d.png", FPath, count);
-		D3DXSaveTextureToFile(texpath, D3DXIFF_PNG, pMaterial->m_pTexture, NULL);
+		fprintf(fd, " dif(1.000) amb(0.250) emi(0.250) spc(0.000) power(5.00) tex(\"%s%02d.dds\")\n", FName, count);
+		sprintf(texpath, "%s%02d.dds", FPath, count);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 		count++;
 	}
@@ -1836,8 +1825,8 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 		D3DXMATRIX	mat,mat1,mat2;
 		CUSTOMVERTEX* pV1, * pV2;
 		D3DXMatrixIdentity(&mat);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
+		pV1 = pMesh->m_pCPUVertices;
+		pV2 = pMesh->m_pCPUVertices2;
 		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
 			indx1 = pV1->indx; if (indx1 > pMesh->m_mBoneNum || indx1 < 0) indx1 = 0;
 			indx2 = pV2->indx; if (indx2 > pMesh->m_mBoneNum || indx2 < 0) indx2 = 0;
@@ -1851,8 +1840,6 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 			pos.z *= 100.0f;
 			fprintf(fd, "        %4.4f %4.4f %4.4f\n", pos.x, pos.y, pos.z);
 		}
-		(pMesh->m_lpVB2)->Unlock();
-		(pMesh->m_lpVB1)->Unlock();
 		vCnt += pMesh->m_NumVertices;
 		pMesh = (CMesh*)pMesh->Next;
 	}
@@ -1874,12 +1861,12 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 		WORD* pI, * pIndex;
 		int				i1, i2, i3, t1, t2, t3;
 		CUSTOMVERTEX* pV;
-		(pMesh->m_lpIB)->Lock(0, pMesh->m_IBSize, (void**)&pIndex, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV, D3DLOCK_DISCARD);
+		pIndex = pMesh->m_pCPUIndices;
+		pV = pMesh->m_pCPUVertices;
 		CStream* pStream = (CStream*)pMesh->m_Streams.Top();
 		while (pStream != NULL) {
 			pI = pIndex + pStream->GetIndexStart();
-			if (pStream->m_PrimitiveType == D3DPT_TRIANGLESTRIP) {
+			if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
 				i1 = *pI++; i2 = *pI++;
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i3 = *pI++;
@@ -1906,7 +1893,7 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 					i1 = i2; i2 = i3;
 				}
 			}
-			else if (pStream->m_PrimitiveType == D3DPT_TRIANGLELIST) {
+			else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
 				for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
 					i1 = *pI++; i2 = *pI++; i3 = *pI++;
 					if (pMesh->m_FlipFlag) {
@@ -1924,8 +1911,6 @@ bool CModel::outputVerFace(FILE* fd, int partsNo, int type)
 			fCnt += pStream->GetFaceCount();
 			pStream = (CStream*)pStream->Next;
 		}
-		(pMesh->m_lpVB1)->Unlock();
-		(pMesh->m_lpIB)->Unlock();
 		vCnt += pMesh->m_NumVertices;
 		//fCnt += pMesh->m_NumFaces;
 		pMesh = (CMesh*)pMesh->Next;

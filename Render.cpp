@@ -35,29 +35,25 @@ inline DWORD FtoDW( FLOAT f ) { return *((DWORD*)&f); }
 		float		g_mTime				=	0.;
 		CPC			*pPC				=	NULL;
 		CNPC		*pNPC				=	NULL;
-		int			g_mMotionSpeed		=	3000; // 2300
+		int			g_mMotionSpeed		=	3000;
 extern	HWND		hDlg2;
-float				g_mFov			= PAI / 4.f;		// FOV : 60度
-float				g_mAspect		= 1.4f;		// 画面のアスペクト比
-float				g_mNear_z		= 0.1f;			// 最近接距離
-float				g_mFar_z		= 400.0f;		// 最遠方距離
-D3DLIGHT9			g_mLight,g_mLightbase;
+float				g_mFov			= PAI / 4.f;
+float				g_mAspect		= 1.4f;
+float				g_mNear_z		= 0.1f;
+float				g_mFar_z		= 400.0f;
+LIGHTDATA			g_mLight, g_mLightbase;
 static	float		fTime		= 0;
-extern	unsigned long	VertexShaderVersion;
-extern	int				MaxVertexShaderConst; // 頂点シェーダー　MAX　Matrix
 extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
 
-D3DXMATRIX			g_mProjection, g_mView,g_mEyeMat;
-float				g_mEyeScale=1.f,g_mEyeAlph = 0.f,g_mEyeBeta = 0.f;
-float				g_mLightAlph = 0.f,g_mLightBeta = 0.f;
-D3DXVECTOR3			g_mEye,g_mEyebase( 0.0f,	 0.f, 3.0f);
-D3DXVECTOR3			g_mAt(	0.0f,	 1.1f,	0.0f);
-D3DXVECTOR3			g_mUp(	0.0f,	 1.0f,	0.0f);
-LPDIRECT3DSURFACE9	g_pBackBuffer;					// バックバッファ
-LPDIRECT3DSURFACE9	g_pZBuffer;						// Zバッファ
+D3DXMATRIX			g_mProjection, g_mView, g_mEyeMat;
+float				g_mEyeScale=1.f, g_mEyeAlph = 0.f, g_mEyeBeta = 0.f;
+float				g_mLightAlph = 0.f, g_mLightBeta = 0.f;
+D3DXVECTOR3			g_mEye, g_mEyebase( 0.0f, 0.f, 3.0f );
+D3DXVECTOR3			g_mAt(  0.0f, 1.1f, 0.0f );
+D3DXVECTOR3			g_mUp(  0.0f, 1.0f, 0.0f );
 float				g_mLightDist = 1.5f;
 D3DXVECTOR3			g_mLightPosition(0.f,0.f,0.f);
-D3DXMATRIX			g_mViewLight;					// ライトから見た場合のビューマトリックス
+D3DXMATRIX			g_mViewLight;
 
 extern	long		g_mScreenWidth;
 extern	long		g_mScreenHeight;
@@ -94,8 +90,8 @@ void Rendering( void )
 	//-----------------------------------------------
 	unsigned long poly = 0;
 	//	ライト位置の計算
-	g_mLightPosition = g_mAt+g_mLightDist*-(D3DXVECTOR3)g_mLight.Direction;
-	D3DXMatrixLookAtLH( &g_mViewLight,&g_mLightPosition,&g_mAt,&g_mUp);
+	g_mLightPosition = g_mAt + g_mLightDist * (-g_mLight.Direction);
+	D3DXMatrixLookAtLH( &g_mViewLight, &g_mLightPosition, &g_mAt, &g_mUp );
 
 	pPC->GetWorldPosition( Pos );
 	if (g_mPCFlag) {
@@ -130,65 +126,33 @@ void Rendering( void )
 //======================================================================
 bool Create3DSpace( void )
 {
-	HRESULT	hr;
-	//===========================================================
-	// バックバッファ取得
-	//===========================================================
-	hr = GetDevice()->GetRenderTarget( 0,&g_pBackBuffer );
-	if FAILED( hr ) return false;
-
-	//===========================================================
-	// Zバッファ生成
-	//===========================================================
-	hr = GetDevice()->GetDepthStencilSurface( &g_pZBuffer );
-	if FAILED( hr ) return false;
-
 	//===========================================================
 	// プロジェクション行列の設定
 	//===========================================================
-	// 行列生成
 	D3DXMatrixPerspectiveFovLH( &g_mProjection, g_mFov, g_mAspect, g_mNear_z, g_mFar_z );
 
 	//===========================================================
 	// デフォルトのカメラの設定
 	//===========================================================
-
 	D3DXMatrixLookAtLH( &g_mView, &g_mEye, &g_mAt, &g_mUp );
+
 	//=================================================
-	// レンダリングステート
+	// ライト設定
 	//=================================================
-	GetDevice()->SetRenderState( D3DRS_DITHERENABLE,		TRUE );
-	GetDevice()->SetRenderState( D3DRS_ZENABLE,				TRUE );
-	GetDevice()->SetRenderState( D3DRS_ZWRITEENABLE,		TRUE );
-	//=================================================
-	// ライト
-	//=================================================
-	memset( &g_mLight, 0x00, sizeof(D3DLIGHT9) );
-	memset( &g_mLightbase, 0x00, sizeof(D3DLIGHT9) );
-	g_mLight.Type			= D3DLIGHT_DIRECTIONAL;
-	g_mLight.Diffuse.a		= 1.0f;
-	g_mLight.Diffuse.r		= 0.8f;
-	g_mLight.Diffuse.g		= 0.8f;
-	g_mLight.Diffuse.b		= 0.8f;
-	g_mLight.Ambient.a		= 1.0f;
-	g_mLight.Ambient.r		= 0.5f;
-	g_mLight.Ambient.g		= 0.5f;
-	g_mLight.Ambient.b		= 0.5f;
-	g_mLight.Specular.a	= 1.0f;
-	g_mLight.Specular.r	= 0.5f;
-	g_mLight.Specular.g	= 0.5f;
-	g_mLight.Specular.b	= 0.5f;
-	D3DXVec3Normalize( (D3DXVECTOR3*)&g_mLightbase.Direction, &D3DXVECTOR3( 0.3f, -1.0f, 0.3f) );
+	memset( &g_mLight,     0x00, sizeof(g_mLight) );
+	memset( &g_mLightbase, 0x00, sizeof(g_mLightbase) );
+	g_mLight.Diffuse.r  = 0.8f; g_mLight.Diffuse.g  = 0.8f; g_mLight.Diffuse.b  = 0.8f; g_mLight.Diffuse.a  = 1.0f;
+	g_mLight.Ambient.r  = 0.5f; g_mLight.Ambient.g  = 0.5f; g_mLight.Ambient.b  = 0.5f; g_mLight.Ambient.a  = 1.0f;
+	g_mLight.Specular.r = 0.5f; g_mLight.Specular.g = 0.5f; g_mLight.Specular.b = 0.5f; g_mLight.Specular.a = 1.0f;
+	D3DXVec3Normalize( &g_mLightbase.Direction, &D3DXVECTOR3( 0.3f, -1.0f, 0.3f ) );
 	g_mLight.Direction = g_mLightbase.Direction;
-	GetDevice()->SetLight( 0, &g_mLight );
-	GetDevice()->LightEnable( 0, TRUE );
 
 	//===========================================================
 	// ライト方向のカメラの設定
 	//===========================================================
 
-	g_mLightPosition = g_mAt+g_mLightDist*-(D3DXVECTOR3)g_mLight.Direction;
-	D3DXMatrixLookAtLH( &g_mViewLight,&g_mLightPosition,&g_mAt,&g_mUp);
+	g_mLightPosition = g_mAt + g_mLightDist * (-g_mLight.Direction);
+	D3DXMatrixLookAtLH( &g_mViewLight, &g_mLightPosition, &g_mAt, &g_mUp );
 	return true;
 }
 

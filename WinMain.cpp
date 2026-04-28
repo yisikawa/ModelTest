@@ -41,7 +41,7 @@ int		g_mShlBoneTbl[8][2]={ {64,78},{60,45},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 
 int		g_mDispBoneNo=1,g_mShlBoneNoR=g_mShlBoneTbl[0][0],g_mShlBoneNoL=g_mShlBoneTbl[0][1];
 extern	CPC		*pPC;
 extern	CNPC	*pNPC;
-extern	D3DLIGHT9		g_mLight,g_mLightbase;
+extern	LIGHTDATA		g_mLight,g_mLightbase;
 extern	D3DXMATRIX		g_mProjection, g_mView,g_mEyeMat;
 extern	float			g_mEyeScale,g_mEyeAlph,g_mEyeBeta;
 extern	float			g_mLightAlph,g_mLightBeta;
@@ -429,22 +429,15 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 			//======================================
 
 			// バックバッファと Z バッファをクリア
-			GetDevice()->Clear( 0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER| D3DCLEAR_STENCIL, D3DCOLOR_XRGB(200,200,255), 1.f, 0 );
-//			GetDevice()->Clear( 0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(0,0,0), 1, 0 );
-			// シーン開始
-			if SUCCEEDED( GetDevice()->BeginScene() ) {
-				// 各種処理
-				Rendering();
+			float clearColor[4] = { 200/255.f, 200/255.f, 255/255.f, 1.f };
+			GetContext()->ClearRenderTargetView( GetRenderTargetView(), clearColor );
+			GetContext()->ClearDepthStencilView( GetDepthStencilView(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0 );
 
-				// シーン終了
-				GetDevice()->EndScene();
+			// 描画
+			Rendering();
 
-				// バックバッファの内容をプライマリに転送
-				if FAILED( GetDevice()->Present( NULL, NULL, NULL, NULL ) ) {
-					// リセット
-					GetDevice()->Reset( GetAdapter() );
-				}
-			}
+			// バックバッファの内容をプライマリに転送
+			GetSwapChain()->Present( 1, 0 );
 		}
 	}
 
@@ -1347,9 +1340,8 @@ static short	x1=-1,y1=-1,x2,y2;
 					D3DXMatrixRotationY(&matY,g_mLightAlph);
 					D3DXMatrixRotationX(&matX,g_mLightBeta);
 					mat = matX * matY;
-					D3DXVec3TransformNormal((D3DXVECTOR3*)&g_mLight.Direction,(D3DXVECTOR3*)&g_mLightbase.Direction,&mat);
-					D3DXVec3Normalize( (D3DXVECTOR3*)&g_mLight.Direction, (D3DXVECTOR3*)&g_mLight.Direction );
-					GetDevice()->SetLight( 0, &g_mLight );
+					D3DXVec3TransformNormal( &g_mLight.Direction, &g_mLightbase.Direction, &mat );
+					D3DXVec3Normalize( &g_mLight.Direction, &g_mLight.Direction );
 				}
 			}
 			x1 = x2; y1 = y2;

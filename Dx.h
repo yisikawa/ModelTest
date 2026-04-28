@@ -1,11 +1,36 @@
-﻿
+
 #pragma once
 
 //======================================================================
 // INCLUDE
 //======================================================================
-#include <d3d9.h>
-#include <d3dx9.h>
+#include <d3d11.h>
+#include <dxgi.h>
+#include <d3dcompiler.h>
+#include "DxMath.h"
+
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
+
+
+//======================================================================
+// 定数バッファ レイアウト
+//======================================================================
+struct CBPerFrame
+{
+	XMFLOAT4X4 matView;
+	XMFLOAT4X4 matProj;
+	XMFLOAT4   lightDir;      // ワールド空間ライト方向（正規化済み、光源へ向かう方向）
+	XMFLOAT4   lightDiffuse;
+	XMFLOAT4   lightAmbient;
+};
+
+struct CBPerObject
+{
+	XMFLOAT4X4 matWorld;
+	XMFLOAT4X4 boneMatrices[128];
+};
 
 
 //======================================================================
@@ -13,10 +38,20 @@
 //======================================================================
 bool InitD3D( void );
 void ReleaseD3D( void );
+bool InitRenderTarget( void );
+bool InitShaders( void );
 
-LPDIRECT3DDEVICE9 GetDevice( void );
-D3DPRESENT_PARAMETERS *GetAdapter( void );
-unsigned long GetVertexShaderVersion( void );
+ID3D11Device*           GetDevice( void );
+ID3D11DeviceContext*    GetContext( void );
+IDXGISwapChain*         GetSwapChain( void );
+ID3D11RenderTargetView* GetRenderTargetView( void );
+ID3D11DepthStencilView* GetDepthStencilView( void );
+ID3D11InputLayout*      GetInputLayout( void );
+ID3D11VertexShader*     GetVertexShader( void );
+ID3D11PixelShader*      GetPixelShader( void );
+ID3D11Buffer*           GetCBPerFrame( void );
+ID3D11Buffer*           GetCBPerObject( void );
+ID3D11SamplerState*     GetLinearSampler( void );
 
-HRESULT CreateVB( LPDIRECT3DVERTEXBUFFER9 *lpVB, DWORD size, DWORD Usage, DWORD fvf );
-HRESULT CreateIB( LPDIRECT3DINDEXBUFFER9 *lpIB, DWORD size, DWORD Usage );
+HRESULT CreateVB( ID3D11Buffer** ppVB, UINT byteWidth, bool dynamic = false );
+HRESULT CreateIB( ID3D11Buffer** ppIB, UINT byteWidth, bool dynamic = false );

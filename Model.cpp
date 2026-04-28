@@ -6,6 +6,7 @@
 #include <string>
 #include <stdio.h>
 #include "Dx.h"
+#include "Render.h"
 #include "Model.h"
 
 //Function
@@ -13,8 +14,6 @@ DWORD _GetFileNameFromIDsub(DWORD dwV,DWORD dwID);
 BOOL GetFileNameFromDno(LPSTR filename,DWORD dwID);
 BOOL GetFileNameFromDir(LPSTR filename,char *DataName );
 DWORD	ConvertStr2Dno( char* DataName );
-HRESULT CreateVB( LPDIRECT3DVERTEXBUFFER9 *lpVB, DWORD size, DWORD Usage, DWORD fvf );
-HRESULT CreateIB( LPDIRECT3DINDEXBUFFER9 *lpIB, DWORD size, DWORD Usage );
 
 // DEFINE
 #define SAFE_RELEASE(p)		if ( (p) != NULL ) { (p)->Release(); (p) = NULL; }
@@ -28,7 +27,6 @@ extern const D3DXMATRIX matrixMirrorX;
 extern const D3DXMATRIX matrixMirrorY;
 extern const D3DXMATRIX matrixMirrorZ;
 extern int g_mBLCnvTbl[9][10];
-extern D3DVERTEXELEMENT9 VS0Formats[];
 
 // 他のファイルで定義されているグローバル変数を参照
 extern bool g_mPCFlag;
@@ -40,14 +38,6 @@ extern void convert_texture_path(char *path);
 extern	CPC			*pPC;
 extern	CNPC		*pNPC;
 extern	bool		g_mPCFlag;
-extern	BOOL		g_mIsUseSoftware;
-extern	D3DLIGHT9	g_mLight,g_mLightbase;
-extern	D3DXMATRIX	g_mProjection, g_mView;
-extern	D3DXVECTOR3	g_mAt,g_mEye,g_mUp;
-extern	float		g_mTime;
-extern	float		g_mLightDist;
-extern	D3DXVECTOR3	g_mLightPosition;
-extern	D3DXMATRIX	g_mViewLight;					// ライトから見た場合のビューマトリックス
 extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
 extern	int			g_mDispBoneNo,g_mShlBoneNoR,g_mShlBoneNoL;
 extern	char		g_meshPath[];
@@ -667,124 +657,86 @@ float CModel::MaxMotionTime( void )
 //======================================================================
 unsigned long CModel::Rendering( void )
 {
-	int				DispCheck;
-	unsigned long	count = 0;
+	unsigned long count = 0;
+	auto *pCtx = GetContext();
 
-	GetDevice()->SetRenderState(D3DRS_LIGHTING, FALSE);   // 発電所を回す！
-	//GetDevice()->SetRenderState(D3DRS_AMBIENT, 0xff030303);   // 世の中をちょっと白く照らす
-	GetDevice()->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-	GetDevice()->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-	GetDevice()->SetRenderState(D3DRS_STENCILENABLE, FALSE);
-	GetDevice()->SetRenderState(D3DRS_ALPHATESTENABLE, TRUE);
-	GetDevice()->SetRenderState(D3DRS_ALPHAREF, 0x01);
-	GetDevice()->SetRenderState(D3DRS_ALPHAFUNC, D3DCMP_GREATER);
-	//GetDevice()->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
-	//GetDevice()->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
-	//GetDevice()->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE2X);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE2X);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-	//GetDevice()->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE);
-	//GetDevice()->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
-	//GetDevice()->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
-
-	if( g_mDispWire ) {
-		GetDevice()->SetRenderState( D3DRS_FILLMODE,D3DFILL_WIREFRAME );
-	} else {
-		GetDevice()->SetRenderState( D3DRS_FILLMODE,D3DFILL_SOLID );
+	// ---- CBPerFrame アップロード ----
+	{
+		D3D11_MAPPED_SUBRESOURCE msr = {};
+		if ( SUCCEEDED( pCtx->Map( GetCBPerFrame(), 0, D3D11_MAP_WRITE_DISCARD, 0, &msr ) ) ) {
+			CBPerFrame *pF    = (CBPerFrame*)msr.pData;
+			pF->matView       = g_mView;
+			pF->matProj       = g_mProjection;
+			pF->lightDir      = XMFLOAT4( g_mLight.Direction.x, g_mLight.Direction.y, g_mLight.Direction.z, 0.f );
+			pF->lightDiffuse  = XMFLOAT4( g_mLight.Diffuse.r,   g_mLight.Diffuse.g,   g_mLight.Diffuse.b,   g_mLight.Diffuse.a );
+			pF->lightAmbient  = XMFLOAT4( g_mLight.Ambient.r,   g_mLight.Ambient.g,   g_mLight.Ambient.b,   g_mLight.Ambient.a );
+			pCtx->Unmap( GetCBPerFrame(), 0 );
+		}
 	}
-	GetDevice()->SetTransform(D3DTS_VIEW, &g_mView);
-	GetDevice()->SetTransform(D3DTS_PROJECTION, &g_mProjection);
+	ID3D11Buffer *pCBF = GetCBPerFrame();
+	pCtx->VSSetConstantBuffers( 0, 1, &pCBF );
 
-	//---------------------------------------------------------
-	// 頂点処理
-	//---------------------------------------------------------
-	IDirect3DVertexDeclaration9	*VertexFormat; 
-	GetDevice()->SetSoftwareVertexProcessing(g_mIsUseSoftware);
-	GetDevice()->CreateVertexDeclaration(VS0Formats, &VertexFormat);
-	GetDevice()->SetVertexDeclaration(VertexFormat);
-	int				indx1,indx2;
-	D3DXVECTOR4		p1,n1;
-	D3DXMATRIX		mat,mat1,mat2;
-	CUSTOMVERTEX	*pV1, *pV2;
+	// ---- 固定シェーダー設定 ----
+	pCtx->VSSetShader( GetVertexShader(), nullptr, 0 );
+	pCtx->PSSetShader( GetPixelShader(),  nullptr, 0 );
+	pCtx->IASetInputLayout( GetInputLayout() );
+	ID3D11SamplerState *pSmp = GetLinearSampler();
+	pCtx->PSSetSamplers( 0, 1, &pSmp );
+
 	CMesh *pMesh = (CMesh*)m_Meshs.Top();
 	while ( pMesh != NULL )
 	{
-		DispCheck = pMesh->GetDispCheck();
+		int DispCheck = pMesh->GetDispCheck();
 
-		//---------------------------------------------------------
-		// 頂点バッファ1をデバイスに設定
-		//---------------------------------------------------------
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i<pMesh->m_NumVertices; i++, pV1++, pV2++) {
-			indx1 = pV1->indx; if (indx1>pMesh->m_mBoneNum || indx1 <0) indx1 = 0;
-			indx2 = pV2->indx; if (indx2>pMesh->m_mBoneNum || indx2 <0) indx2 = 0;
-			mat1 = m_Bones[pMesh->m_pBoneTbl[indx1]].m_mInvTrans*m_Bones[pMesh->m_pBoneTbl[indx1]].m_mWorld*pV1->b1;
-			mat2 = m_Bones[pMesh->m_pBoneTbl[indx2]].m_mInvTrans*m_Bones[pMesh->m_pBoneTbl[indx2]].m_mWorld*pV2->b1;
-			mat = mat1 + mat2;
-			p1.x = pV1->p.x; p1.y = pV1->p.y; p1.z = pV1->p.z; p1.w = 1.0;
-			D3DXVec4Transform(&p1, &p1, &mat);
-			n1.x = pV1->n.x; n1.y = pV1->n.y; n1.z = pV1->n.z; n1.w = 1.0;
-			D3DXVec4Transform(&n1, &n1, &mat);
-			D3DXVec4Normalize(&n1, &n1);
-			pV2->p.x = p1.x; pV2->p.y = p1.y; pV2->p.z = p1.z;
-			pV2->n.x = n1.x; pV2->n.y = n1.y; pV2->n.z = n1.z;
+		// ---- CBPerObject: ボーン行列をアップロード ----
+		{
+			D3D11_MAPPED_SUBRESOURCE msr = {};
+			if ( SUCCEEDED( pCtx->Map( GetCBPerObject(), 0, D3D11_MAP_WRITE_DISCARD, 0, &msr ) ) ) {
+				CBPerObject *pO = (CBPerObject*)msr.pData;
+				D3DXMatrixIdentity( (D3DXMATRIX*)&pO->matWorld );
+				for ( int i = 0; i < (int)pMesh->m_mBoneNum; i++ ) {
+					int g = pMesh->m_pBoneTbl[i];
+					D3DXMATRIX bmat = m_Bones[g].m_mInvTrans * m_Bones[g].m_mWorld;
+					pO->boneMatrices[i] = *(XMFLOAT4X4*)&bmat;
+				}
+				pCtx->Unmap( GetCBPerObject(), 0 );
+			}
 		}
-		(pMesh->m_lpVB2)->Unlock();
-		(pMesh->m_lpVB1)->Unlock();
+		ID3D11Buffer *pCBO = GetCBPerObject();
+		pCtx->VSSetConstantBuffers( 1, 1, &pCBO );
 
-		//---------------------------------------------------------
-		// 頂点バッファ1をデバイスに設定
-		//---------------------------------------------------------
-		GetDevice()->SetStreamSource(0, pMesh->m_lpVB2, 0, D3DXGetFVFVertexSize(pMesh->m_FVF));
-		//---------------------------------------------------------
-		// インデックスバッファをデバイスに設定
-		//---------------------------------------------------------
-		GetDevice()->SetIndices(pMesh->m_lpIB);
+		// ---- カリング方向（ミラーメッシュは反転） ----
+		pCtx->RSSetState( pMesh->m_FlipFlag ? GetRasterizerFlipped() : GetRasterizerNormal() );
+		// ---- IA バインド (VB1 = bone1, VB2 = bone2) ----
+		UINT strides[2] = { sizeof(CUSTOMVERTEX), sizeof(CUSTOMVERTEX) };
+		UINT offsets[2] = { 0, 0 };
+		ID3D11Buffer* vbs[2] = { pMesh->m_lpVB1, pMesh->m_lpVB2 };
+		pCtx->IASetVertexBuffers( 0, 2, vbs, strides, offsets );
+		pCtx->IASetIndexBuffer( pMesh->m_lpIB, DXGI_FORMAT_R16_UINT, 0 );
 
-		CStream		*pStream;
-		//---------------------------------------------------------
-		// サーフェイスごとにレンダリング
-		//---------------------------------------------------------
-		int stno = 0;
-		pStream = (CStream*)pMesh->m_Streams.Top();
-		while (pStream != NULL) {
-			stno++;
-			int	DispLevel = pStream->GetDispLevel();
-			if (g_mPCFlag && DispLevel != 0 && DispLevel < DispCheck) {
+		CStream *pStream = (CStream*)pMesh->m_Streams.Top();
+		while ( pStream != NULL ) {
+			int DispLevel = pStream->GetDispLevel();
+			if ( g_mPCFlag && DispLevel != 0 && DispLevel < DispCheck ) {
 				pStream = (CStream*)pStream->Next;
 				continue;
 			}
+			pCtx->IASetPrimitiveTopology( pStream->m_PrimitiveType );
 
-			//
-			// c14 : マテリアル
-			//
-			CMaterial *pMaterial = (CMaterial*)pStream->m_pMaterial;
+			CMaterial *pMat = pStream->m_pMaterial;
+			ID3D11ShaderResourceView *pSRV = pMat ? pMat->GetTexture() : nullptr;
+			pCtx->PSSetShaderResources( 0, 1, &pSRV );
 
-			// デバイスにテクスチャ設定
-			if (pMaterial)
-				GetDevice()->SetTexture(0, pMaterial->GetTexture());
-			else
-				GetDevice()->SetTexture(0, NULL);
-			GetDevice()->DrawIndexedPrimitive(
-				pStream->GetPrimitiveType(),
-				0,
-				0,
-				pMesh->m_NumVertices,
-				pStream->GetIndexStart(),
-				pStream->GetFaceCount());
+			UINT indexCount = ( pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP )
+				? pStream->GetFaceCount() + 2
+				: pStream->GetFaceCount() * 3;
+			pCtx->DrawIndexed( indexCount, (UINT)pStream->GetIndexStart(), 0 );
+
 			pStream = (CStream*)pStream->Next;
 		}
 		count += pMesh->m_NumFaces;
 		pMesh = (CMesh*)pMesh->Next;
-
 	}
-	//GetDevice()->SetRenderState( D3DRS_ALPHATESTENABLE,		FALSE );
-	//GetDevice()->SetRenderState( D3DRS_CULLMODE,			D3DCULL_NONE );
 	return count;
 }
 
@@ -796,28 +748,7 @@ unsigned long CModel::Rendering( void )
 //======================================================================
 void CModel::BoneRendering( void )
 {
-	D3DXVECTOR3		pos[3];
-	D3DXMATRIX		mat;
-
-//	// 変換行列
-	GetDevice()->SetRenderState(D3DRS_LIGHTING, FALSE);   // 発電所を回す！
-	GetDevice()->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-	GetDevice()->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-	GetDevice()->SetRenderState(D3DRS_STENCILENABLE, FALSE);
-	GetDevice()->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-	GetDevice()->SetTransform(D3DTS_VIEW, &g_mView);
-	GetDevice()->SetTransform(D3DTS_PROJECTION, &g_mProjection);
-	GetDevice()->SetFVF(D3DFVF_XYZ);
-	for (int i = 0; i < m_nBone; i++) {
-		// child bone
-		if (m_Bones[i].m_pParent == NULL) continue;
-		mat = ((CBone*)m_Bones[i].m_pParent)->m_mWorld;
-		pos[0].x = mat._41; pos[0].y = mat._42; pos[0].z = mat._43;
-		mat = m_Bones[i].m_mWorld;
-		pos[1].x = mat._41; pos[1].y = mat._42; pos[1].z = mat._43;
-		GetDevice()->DrawPrimitiveUP(D3DPT_LINELIST, 2, pos, sizeof(D3DXVECTOR3));
-	}
-	return;
+	// TODO Phase5: ボーン描画は専用ラインシェーダーが必要。現在は未実装。
 }
 
 
@@ -829,20 +760,19 @@ bool CModel::ConvertMesh(void) {
 	{
 		int				indx;
 		D3DXVECTOR4		pos, p1, p2;
-		D3DXVECTOR3		norm,n1, n2;
+		D3DXVECTOR3		norm, n1, n2;
 		D3DXMATRIX		mat;
-		CUSTOMVERTEX	*pV1, *pV2;
+		CUSTOMVERTEX	*pV1 = pMesh->m_pCPUVertices;
+		CUSTOMVERTEX	*pV2 = pMesh->m_pCPUVertices2;
 		D3DXMatrixIdentity(&mat);
-		(pMesh->m_lpVB1)->Lock(0, pMesh->m_VBSize, (void**)&pV1, D3DLOCK_DISCARD);
-		(pMesh->m_lpVB2)->Lock(0, pMesh->m_VBSize, (void**)&pV2, D3DLOCK_DISCARD);
-		for (unsigned int i = 0; i<pMesh->m_NumVertices; i++, pV1++, pV2++) {
-			indx = pV1->indx; if (indx>pMesh->m_mBoneNum || indx <0) indx = 0;
+		for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
+			indx = pV1->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
 			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
 			p1.x = pV1->p.x; p1.y = pV1->p.y; p1.z = pV1->p.z; p1.w = pV1->b1;
 			D3DXVec4Transform(&p1, &p1, &mat);
 			n1.x = pV1->n.x; n1.y = pV1->n.y; n1.z = pV1->n.z;
 			D3DXVec3TransformCoord(&n1, &n1, &mat);
-			indx = pV2->indx; if (indx>pMesh->m_mBoneNum || indx <0) indx = 0;
+			indx = pV2->indx; if (indx > pMesh->m_mBoneNum || indx < 0) indx = 0;
 			mat = m_Bones[pMesh->m_pBoneTbl[indx]].m_mWorld;
 			p2.x = pV2->p.x; p2.y = pV2->p.y; p2.z = pV2->p.z; p2.w = pV2->b1;
 			D3DXVec4Transform(&p2, &p2, &mat);
@@ -858,8 +788,18 @@ bool CModel::ConvertMesh(void) {
 			pV1->n.z = pV2->n.z = norm.z;
 			pV2->u = pV1->u; pV2->v = pV1->v;
 		}
-		(pMesh->m_lpVB2)->Unlock();
-		(pMesh->m_lpVB1)->Unlock();
+		// 変換結果を VB1 / VB2 にアップロード
+		{
+			D3D11_MAPPED_SUBRESOURCE msr = {};
+			if ( SUCCEEDED( GetContext()->Map( pMesh->m_lpVB1, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr ) ) ) {
+				memcpy( msr.pData, pMesh->m_pCPUVertices, pMesh->m_VBSize );
+				GetContext()->Unmap( pMesh->m_lpVB1, 0 );
+			}
+			if ( SUCCEEDED( GetContext()->Map( pMesh->m_lpVB2, 0, D3D11_MAP_WRITE_DISCARD, 0, &msr ) ) ) {
+				memcpy( msr.pData, pMesh->m_pCPUVertices2, pMesh->m_VBSize );
+				GetContext()->Unmap( pMesh->m_lpVB2, 0 );
+			}
+		}
 		pMesh = (CMesh*)pMesh->Next;
 	}
 	return true;
@@ -1122,10 +1062,9 @@ bool CPC::LoadDefaultMotion( void )
 //======================================================================
 bool CPC::LoadPCParts()
 {
-	unsigned long FVF = (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1);
+	unsigned long FVF = 0; // DX11: FVF 未使用
 	HRESULT hr;
 	char FileName[512];
-
 
 	//==============================================================
 	// データ初期化
@@ -1460,9 +1399,7 @@ bool CNPC::LoadNPCMotion()
 //======================================================================
 bool CNPC::LoadNPC()
 {
-	unsigned long FVF = (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1);
-	unsigned long FVF1 = (D3DFVF_XYZ|D3DFVF_NORMAL|D3DFVF_DIFFUSE|D3DFVF_TEX1);
-	unsigned long FVF2 = (D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+	unsigned long FVF = 0, FVF1 = 0, FVF2 = 0; // DX11: FVF 未使用
 	char FileName[512];
 
 	//==============================================================
