@@ -670,11 +670,14 @@ unsigned long CModel::Rendering( void )
 			pF->lightDir      = XMFLOAT4( g_mLight.Direction.x, g_mLight.Direction.y, g_mLight.Direction.z, 0.f );
 			pF->lightDiffuse  = XMFLOAT4( g_mLight.Diffuse.r,   g_mLight.Diffuse.g,   g_mLight.Diffuse.b,   g_mLight.Diffuse.a );
 			pF->lightAmbient  = XMFLOAT4( g_mLight.Ambient.r,   g_mLight.Ambient.g,   g_mLight.Ambient.b,   g_mLight.Ambient.a );
+			pF->lightSpecular = XMFLOAT4( g_mLight.Specular.r,  g_mLight.Specular.g,  g_mLight.Specular.b,  g_mLight.Specular.a );
+			pF->eyePos        = XMFLOAT4( g_mEye.x,             g_mEye.y,             g_mEye.z,             1.f );
 			pCtx->Unmap( GetCBPerFrame(), 0 );
 		}
 	}
 	ID3D11Buffer *pCBF = GetCBPerFrame();
 	pCtx->VSSetConstantBuffers( 0, 1, &pCBF );
+	pCtx->PSSetConstantBuffers( 0, 1, &pCBF );
 
 	// ---- 固定シェーダー設定 ----
 	pCtx->VSSetShader( GetVertexShader(), nullptr, 0 );
