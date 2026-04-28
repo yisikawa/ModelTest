@@ -39,6 +39,9 @@ float4 main(PS_INPUT input) : SV_TARGET
                     + specular * lightSpecular.rgb;
 
     float4 tex = g_texDiffuse.Sample(g_samLinear, input.texcoord);
+    if (all(tex == 0.0f))
+        tex = float4(1.0f, 1.0f, 1.0f, 1.0f);
+    clip(tex.a - 0.5f);
     float3 finalColor = tex.rgb * lighting;
     return float4(finalColor, tex.a);
 }
