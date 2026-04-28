@@ -26,6 +26,8 @@ struct CBPerFrame
 	XMFLOAT4   lightAmbient;
 	XMFLOAT4   lightSpecular;
 	XMFLOAT4   eyePos;        // ワールド空間カメラ位置
+	XMFLOAT4X4 matLightView;  // ライトビュー行列（シャドウマップ用）
+	XMFLOAT4X4 matLightProj;  // ライト射影行列（シャドウマップ用）
 };
 
 struct CBPerObject
@@ -54,6 +56,14 @@ ID3D11PixelShader*      GetPixelShader( void );
 ID3D11Buffer*           GetCBPerFrame( void );
 ID3D11Buffer*           GetCBPerObject( void );
 ID3D11SamplerState*     GetLinearSampler( void );
+
+ID3D11DepthStencilView*   GetShadowDSV( void );
+ID3D11ShaderResourceView* GetShadowSRV( void );
+ID3D11VertexShader*       GetShadowVS( void );
+ID3D11SamplerState*       GetShadowSampler( void );
+
+void BeginShadowPass( void );
+void EndShadowPass( void );
 
 HRESULT CreateVB( ID3D11Buffer** ppVB, UINT byteWidth, bool dynamic = false );
 HRESULT CreateIB( ID3D11Buffer** ppIB, UINT byteWidth, bool dynamic = false );

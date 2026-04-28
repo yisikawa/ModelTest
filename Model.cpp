@@ -29,7 +29,8 @@ extern const D3DXMATRIX matrixMirrorZ;
 extern int g_mBLCnvTbl[9][10];
 
 // 他のファイルで定義されているグローバル変数を参照
-extern bool g_mPCFlag;
+extern bool      g_mPCFlag;
+extern D3DXMATRIX g_mProjLight;
 
 // Model_Common.cpp で定義されているユーティリティ関数の宣言
 extern int Trim(char *s);
@@ -672,6 +673,8 @@ unsigned long CModel::Rendering( void )
 			pF->lightAmbient  = XMFLOAT4( g_mLight.Ambient.r,   g_mLight.Ambient.g,   g_mLight.Ambient.b,   g_mLight.Ambient.a );
 			pF->lightSpecular = XMFLOAT4( g_mLight.Specular.r,  g_mLight.Specular.g,  g_mLight.Specular.b,  g_mLight.Specular.a );
 			pF->eyePos        = XMFLOAT4( g_mEye.x,             g_mEye.y,             g_mEye.z,             1.f );
+			pF->matLightView  = *(XMFLOAT4X4*)&g_mViewLight;
+			pF->matLightProj  = *(XMFLOAT4X4*)&g_mProjLight;
 			pCtx->Unmap( GetCBPerFrame(), 0 );
 		}
 	}
@@ -752,6 +755,87 @@ unsigned long CModel::Rendering( void )
 void CModel::BoneRendering( void )
 {
 	// TODO Phase5: ボーン描画は専用ラインシェーダーが必要。現在は未実装。
+}
+
+
+//======================================================================
+//
+//		シャドウパス レンダリング
+//
+//		シャドウVSのみでスキニング済み深度をシャドウマップに書き込む
+//======================================================================
+void CModel::ShadowRendering( void )
+{
+	auto *pCtx = GetContext();
+
+	// ---- CBPerFrame アップロード（shadow_vs.hlsl がmatLightView/Projを参照） ----
+	{
+		D3D11_MAPPED_SUBRESOURCE msr = {};
+		if ( SUCCEEDED( pCtx->Map( GetCBPerFrame(), 0, D3D11_MAP_WRITE_DISCARD, 0, &msr ) ) ) {
+			CBPerFrame *pF    = (CBPerFrame*)msr.pData;
+			pF->matView       = g_mView;
+			pF->matProj       = g_mProjection;
+			pF->lightDir      = XMFLOAT4( g_mLight.Direction.x, g_mLight.Direction.y, g_mLight.Direction.z, 0.f );
+			pF->lightDiffuse  = XMFLOAT4( g_mLight.Diffuse.r,   g_mLight.Diffuse.g,   g_mLight.Diffuse.b,   g_mLight.Diffuse.a );
+			pF->lightAmbient  = XMFLOAT4( g_mLight.Ambient.r,   g_mLight.Ambient.g,   g_mLight.Ambient.b,   g_mLight.Ambient.a );
+			pF->lightSpecular = XMFLOAT4( g_mLight.Specular.r,  g_mLight.Specular.g,  g_mLight.Specular.b,  g_mLight.Specular.a );
+			pF->eyePos        = XMFLOAT4( g_mEye.x,             g_mEye.y,             g_mEye.z,             1.f );
+			pF->matLightView  = *(XMFLOAT4X4*)&g_mViewLight;
+			pF->matLightProj  = *(XMFLOAT4X4*)&g_mProjLight;
+			pCtx->Unmap( GetCBPerFrame(), 0 );
+		}
+	}
+	ID3D11Buffer *pCBF = GetCBPerFrame();
+	pCtx->VSSetConstantBuffers( 0, 1, &pCBF );
+
+	pCtx->VSSetShader( GetShadowVS(), nullptr, 0 );
+	pCtx->PSSetShader( nullptr, nullptr, 0 );
+	pCtx->IASetInputLayout( GetInputLayout() );
+
+	CMesh *pMesh = (CMesh*)m_Meshs.Top();
+	while ( pMesh != NULL )
+	{
+		// ---- CBPerObject: ボーン行列をアップロード ----
+		{
+			D3D11_MAPPED_SUBRESOURCE msr = {};
+			if ( SUCCEEDED( pCtx->Map( GetCBPerObject(), 0, D3D11_MAP_WRITE_DISCARD, 0, &msr ) ) ) {
+				CBPerObject *pO = (CBPerObject*)msr.pData;
+				D3DXMatrixIdentity( (D3DXMATRIX*)&pO->matWorld );
+				for ( int i = 0; i < (int)pMesh->m_mBoneNum; i++ ) {
+					int g = pMesh->m_pBoneTbl[i];
+					D3DXMATRIX bmat = m_Bones[g].m_mInvTrans * m_Bones[g].m_mWorld;
+					pO->boneMatrices[i] = *(XMFLOAT4X4*)&bmat;
+				}
+				pCtx->Unmap( GetCBPerObject(), 0 );
+			}
+		}
+		ID3D11Buffer *pCBO = GetCBPerObject();
+		pCtx->VSSetConstantBuffers( 1, 1, &pCBO );
+
+		pCtx->RSSetState( pMesh->m_FlipFlag ? GetRasterizerFlipped() : GetRasterizerNormal() );
+
+		UINT strides[2] = { sizeof(CUSTOMVERTEX), sizeof(CUSTOMVERTEX) };
+		UINT offsets[2] = { 0, 0 };
+		ID3D11Buffer* vbs[2] = { pMesh->m_lpVB1, pMesh->m_lpVB2 };
+		pCtx->IASetVertexBuffers( 0, 2, vbs, strides, offsets );
+		pCtx->IASetIndexBuffer( pMesh->m_lpIB, DXGI_FORMAT_R16_UINT, 0 );
+
+		CStream *pStream = (CStream*)pMesh->m_Streams.Top();
+		while ( pStream != NULL ) {
+			int DispLevel = pStream->GetDispLevel();
+			if ( g_mPCFlag && DispLevel != 0 && DispLevel < pMesh->GetDispCheck() ) {
+				pStream = (CStream*)pStream->Next;
+				continue;
+			}
+			pCtx->IASetPrimitiveTopology( pStream->m_PrimitiveType );
+			UINT indexCount = ( pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP )
+				? pStream->GetFaceCount() + 2
+				: pStream->GetFaceCount() * 3;
+			pCtx->DrawIndexed( indexCount, (UINT)pStream->GetIndexStart(), 0 );
+			pStream = (CStream*)pStream->Next;
+		}
+		pMesh = (CMesh*)pMesh->Next;
+	}
 }
 
 
