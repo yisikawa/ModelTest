@@ -26,6 +26,7 @@ extern D3DXVECTOR3 g_mUp;
 extern D3DXVECTOR3 g_mEye;
 extern D3DXVECTOR3 g_mEyebase;
 extern D3DXMATRIX  g_mViewLight;
+extern D3DXMATRIX  g_mProjLight;
 extern float       g_mLightDist;
 extern D3DXVECTOR3 g_mLightPosition;
 
