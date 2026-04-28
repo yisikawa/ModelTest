@@ -541,6 +541,7 @@ public:
 	virtual void	InitialTransform(void);
 	virtual void	DynamicTransform(void);
 	virtual unsigned long Rendering(void);
+	virtual void	ShadowRendering(void);
 	virtual void	BoneRendering(void);
 	virtual void	RotateZero( D3DXMATRIX *mat );
 	virtual bool	saveMQO(char *FPath, char *FName);

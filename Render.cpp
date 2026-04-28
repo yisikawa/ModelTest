@@ -54,6 +54,7 @@ D3DXVECTOR3			g_mUp(  0.0f, 1.0f, 0.0f );
 float				g_mLightDist = 1.5f;
 D3DXVECTOR3			g_mLightPosition(0.f,0.f,0.f);
 D3DXMATRIX			g_mViewLight;
+D3DXMATRIX			g_mProjLight;
 
 extern	long		g_mScreenWidth;
 extern	long		g_mScreenHeight;
@@ -102,6 +103,11 @@ void Rendering( void )
 			pPC->BoneRendering();
 		}
 		else {
+			// Pass1: シャドウパス
+			BeginShadowPass();
+			pPC->ShadowRendering();
+			EndShadowPass();
+			// Pass2: メインパス
 			poly += pPC->Rendering();
 		}
 	}
@@ -113,6 +119,11 @@ void Rendering( void )
 			pNPC->BoneRendering();
 		}
 		else {
+			// Pass1: シャドウパス
+			BeginShadowPass();
+			pNPC->ShadowRendering();
+			EndShadowPass();
+			// Pass2: メインパス
 			poly += pNPC->Rendering();
 		}
 	}
@@ -153,6 +164,10 @@ bool Create3DSpace( void )
 
 	g_mLightPosition = g_mAt + g_mLightDist * (-g_mLight.Direction);
 	D3DXMatrixLookAtLH( &g_mViewLight, &g_mLightPosition, &g_mAt, &g_mUp );
+
+	// シャドウマップ用ライト正射影行列（キャラクター範囲をカバーする 4x4 単位）
+	XMStoreFloat4x4( (XMFLOAT4X4*)&g_mProjLight,
+	                 XMMatrixOrthographicLH( 4.0f, 4.0f, 0.1f, 10.0f ) );
 	return true;
 }
 

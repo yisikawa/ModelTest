@@ -22,6 +22,10 @@ static ID3D11Buffer*            g_pCBPerObject        = nullptr;
 static ID3D11SamplerState*      g_pLinearSampler      = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerNormal   = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerFlipped  = nullptr;
+static ID3D11DepthStencilView*  g_pShadowDSV          = nullptr;
+static ID3D11ShaderResourceView*g_pShadowSRV          = nullptr;
+static ID3D11VertexShader*      g_pShadowVS           = nullptr;
+static ID3D11SamplerState*      g_pShadowSampler      = nullptr;
 
 
 //======================================================================
@@ -40,6 +44,10 @@ ID3D11Buffer*           GetCBPerObject( void )      { return g_pCBPerObject; }
 ID3D11SamplerState*     GetLinearSampler( void )    { return g_pLinearSampler; }
 ID3D11RasterizerState*  GetRasterizerNormal( void ) { return g_pRasterizerNormal; }
 ID3D11RasterizerState*  GetRasterizerFlipped( void ){ return g_pRasterizerFlipped; }
+ID3D11DepthStencilView*   GetShadowDSV( void )     { return g_pShadowDSV; }
+ID3D11ShaderResourceView* GetShadowSRV( void )     { return g_pShadowSRV; }
+ID3D11VertexShader*       GetShadowVS( void )      { return g_pShadowVS; }
+ID3D11SamplerState*       GetShadowSampler( void ) { return g_pShadowSampler; }
 
 
 //======================================================================
@@ -300,7 +308,114 @@ bool InitShaders( void )
 	rd.FrontCounterClockwise = TRUE;
 	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFlipped );
 
+	//==============================================================================
+	// シャドウパス用頂点シェーダーのコンパイル
+	//==============================================================================
+	ID3DBlob *pShadowVSBlob = nullptr;
+	hr = D3DCompileFromFile( L"shadow_vs.hlsl", nullptr, nullptr,
+	                         "main", "vs_4_0", compileFlags, 0, &pShadowVSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "ShadowVS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreateVertexShader(
+		pShadowVSBlob->GetBufferPointer(), pShadowVSBlob->GetBufferSize(),
+		nullptr, &g_pShadowVS );
+	pShadowVSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// シャドウマップ用テクスチャ / DSV / SRV 生成（2048x2048）
+	//==============================================================================
+	D3D11_TEXTURE2D_DESC shadowTexDesc = {};
+	shadowTexDesc.Width            = 2048;
+	shadowTexDesc.Height           = 2048;
+	shadowTexDesc.MipLevels        = 1;
+	shadowTexDesc.ArraySize        = 1;
+	shadowTexDesc.Format           = DXGI_FORMAT_R32_TYPELESS;
+	shadowTexDesc.SampleDesc.Count = 1;
+	shadowTexDesc.Usage            = D3D11_USAGE_DEFAULT;
+	shadowTexDesc.BindFlags        = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+
+	ID3D11Texture2D *pShadowTex = nullptr;
+	hr = g_pD3DDevice->CreateTexture2D( &shadowTexDesc, nullptr, &pShadowTex );
+	if ( FAILED(hr) ) return false;
+
+	D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format             = DXGI_FORMAT_D32_FLOAT;
+	dsvDesc.ViewDimension      = D3D11_DSV_DIMENSION_TEXTURE2D;
+	hr = g_pD3DDevice->CreateDepthStencilView( pShadowTex, &dsvDesc, &g_pShadowDSV );
+	if ( FAILED(hr) ) { pShadowTex->Release(); return false; }
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format                    = DXGI_FORMAT_R32_FLOAT;
+	srvDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels       = 1;
+	hr = g_pD3DDevice->CreateShaderResourceView( pShadowTex, &srvDesc, &g_pShadowSRV );
+	pShadowTex->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// 比較サンプラー生成（PCF用）
+	//==============================================================================
+	D3D11_SAMPLER_DESC sdShadow = {};
+	sdShadow.Filter         = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+	sdShadow.AddressU       = D3D11_TEXTURE_ADDRESS_BORDER;
+	sdShadow.AddressV       = D3D11_TEXTURE_ADDRESS_BORDER;
+	sdShadow.AddressW       = D3D11_TEXTURE_ADDRESS_BORDER;
+	sdShadow.BorderColor[0] = sdShadow.BorderColor[1] = sdShadow.BorderColor[2] = sdShadow.BorderColor[3] = 1.0f;
+	sdShadow.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
+	sdShadow.MaxLOD         = D3D11_FLOAT32_MAX;
+	hr = g_pD3DDevice->CreateSamplerState( &sdShadow, &g_pShadowSampler );
+	if ( FAILED(hr) ) return false;
+
 	return true;
+}
+
+
+//======================================================================
+//
+//		シャドウパス開始（ライト視点DSVにのみ描画）
+//
+//======================================================================
+void BeginShadowPass( void )
+{
+	// シャドウSRVをPS slot1から外す（同時バインド防止）
+	ID3D11ShaderResourceView *pNullSRV = nullptr;
+	g_pD3DContext->PSSetShaderResources( 1, 1, &pNullSRV );
+
+	// カラーターゲットなしでシャドウDSVのみセット
+	ID3D11RenderTargetView *pNullRTV = nullptr;
+	g_pD3DContext->OMSetRenderTargets( 1, &pNullRTV, g_pShadowDSV );
+	g_pD3DContext->ClearDepthStencilView( g_pShadowDSV, D3D11_CLEAR_DEPTH, 1.0f, 0 );
+
+	D3D11_VIEWPORT vp = {};
+	vp.Width    = vp.Height = 2048.0f;
+	vp.MaxDepth = 1.0f;
+	g_pD3DContext->RSSetViewports( 1, &vp );
+}
+
+
+//======================================================================
+//
+//		シャドウパス終了（メインRTV/DSVを復元しシャドウSRVをバインド）
+//
+//======================================================================
+void EndShadowPass( void )
+{
+	g_pD3DContext->OMSetRenderTargets( 1, &g_pRenderTargetView, g_pDepthStencilView );
+
+	D3D11_VIEWPORT vp = {};
+	vp.Width    = (FLOAT)GetScreenWidth();
+	vp.Height   = (FLOAT)GetScreenHeight();
+	vp.MaxDepth = 1.0f;
+	g_pD3DContext->RSSetViewports( 1, &vp );
+
+	g_pD3DContext->PSSetShaderResources( 1, 1, &g_pShadowSRV );
+	g_pD3DContext->PSSetSamplers( 1, 1, &g_pShadowSampler );
 }
 
 
@@ -311,6 +426,10 @@ bool InitShaders( void )
 //======================================================================
 void ReleaseD3D( void )
 {
+	if ( g_pShadowSampler )     { g_pShadowSampler->Release();     g_pShadowSampler     = nullptr; }
+	if ( g_pShadowSRV )        { g_pShadowSRV->Release();        g_pShadowSRV         = nullptr; }
+	if ( g_pShadowDSV )        { g_pShadowDSV->Release();        g_pShadowDSV         = nullptr; }
+	if ( g_pShadowVS )         { g_pShadowVS->Release();         g_pShadowVS          = nullptr; }
 	if ( g_pRasterizerFlipped ) { g_pRasterizerFlipped->Release(); g_pRasterizerFlipped = nullptr; }
 	if ( g_pRasterizerNormal )  { g_pRasterizerNormal->Release();  g_pRasterizerNormal  = nullptr; }
 	if ( g_pLinearSampler )     { g_pLinearSampler->Release();     g_pLinearSampler     = nullptr; }
