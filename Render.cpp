@@ -145,6 +145,9 @@ bool Create3DSpace( void )
 	//===========================================================
 	// デフォルトのカメラの設定
 	//===========================================================
+	D3DXMatrixIdentity( &g_mEyeMat );
+	D3DXVec3TransformNormal( &g_mEye, &g_mEyebase, &g_mEyeMat );
+	g_mEye += g_mAt;
 	D3DXMatrixLookAtLH( &g_mView, &g_mEye, &g_mAt, &g_mUp );
 
 	//=================================================
