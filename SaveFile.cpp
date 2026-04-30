@@ -10,9 +10,28 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <DirectXTex.h>
+#include <wincodec.h>
+#pragma comment(lib, "DirectXTex.lib")
 
 using namespace std;
 using namespace fbxsdk;
+
+static void SaveTextureToPNG(const char* path, ID3D11Resource* pRes)
+{
+    DirectX::ScratchImage image;
+    if (FAILED(DirectX::CaptureTexture(GetDevice(), GetContext(), pRes, image))) return;
+    const DirectX::Image* img = image.GetImage(0, 0, 0);
+    if (!img) return;
+    DirectX::ScratchImage converted;
+    if (DirectX::IsCompressed(image.GetMetadata().format)) {
+        if (FAILED(DirectX::Decompress(*img, DXGI_FORMAT_R8G8B8A8_UNORM, converted))) return;
+        img = converted.GetImage(0, 0, 0);
+    }
+    wchar_t wpath[MAX_PATH];
+    MultiByteToWideChar(CP_ACP, 0, path, -1, wpath, MAX_PATH);
+    DirectX::SaveToWICFile(*img, DirectX::WIC_FLAGS_NONE, GUID_ContainerFormatPng, wpath);
+}
 
 #define SAFE_RELEASE(p)		if ( (p) != NULL ) { (p)->Release(); (p) = NULL; }
 #define SAFE_DELETES(p)		if ( (p) != NULL ) { delete [] (p); (p) = NULL; }
@@ -707,15 +726,15 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		//strcpy(texName, pMaterial->m_Name);
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
-		sprintf(texpath, "%s%s.dds", fpath, texName);
+		sprintf(texpath, "%s%s.png", fpath, texName);
 		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());
 		material->Ambient.Set(FbxDouble3(0., 0., 0.));
 		material->Diffuse.Set(FbxDouble3(1., 1., 1.));
 		material->Specular.Set(FbxDouble3(0., 0., 0.));
 		material->ShadingModel.Set("Phong");
 		FbxFileTexture* texture = FbxFileTexture::Create(fbxScene, ("Tex_" + string(texName)).c_str());
-		texture->SetFileName((string(texName)+".dds").c_str()); // テクスチャファイルパス設定
-		texture->SetRelativeFileName((string(texName) + ".dds").c_str());
+		texture->SetFileName((string(texName)+".png").c_str()); // テクスチャファイルパス設定
+		texture->SetRelativeFileName((string(texName) + ".png").c_str());
         texture->SetTextureUse(FbxTexture::eStandard);
         texture->SetMappingType(FbxTexture::eUV);
         texture->SetMaterialUse(FbxFileTexture::eModelMaterial); 
@@ -726,7 +745,7 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		// マテリアルをメッシュノードにアサイン
 		meshNode->AddMaterial(material);
 		//fbxScene->AddMaterial(material);
-		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); SaveTextureToPNG(texpath, pRes); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -990,8 +1009,8 @@ bool CModel::outputMeshX(char* FPath, char* FName, FILE* fd) {
 		//strcpy(texName, pMaterial->m_Name);
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
-		sprintf(texpath, "%s%s.dds", fpath, texName);
-		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
+		sprintf(texpath, "%s%s.png", fpath, texName);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); SaveTextureToPNG(texpath, pRes); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -1022,8 +1041,8 @@ bool CModel::outputMultiMeshX(char* FPath, char* FName, FILE* fd) {
 	while (pMaterial != NULL)
 	{
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		sprintf(texpath, "%s%s.dds", fpath, texName);
-		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
+		sprintf(texpath, "%s%s.png", fpath, texName);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); SaveTextureToPNG(texpath, pRes); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 
 	}
@@ -1562,7 +1581,7 @@ bool CModel::outputMaterial(char* FPath, char* FName, FILE* fd) {
 		PrintTab(fd, XTab); fprintf(fd, "TextureFilename {\n"); XTab++;
 		//		fprintf(fd, " \"%s%02d.png\";\n", FName, count);
 		char texName[256]; strcpynosp(texName, pMaterial->m_Name); Trim(texName);
-		PrintTab(fd, XTab); fprintf(fd, "\"%s.dds\";\n", texName);
+		PrintTab(fd, XTab); fprintf(fd, "\"%s.png\";\n", texName);
 		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 		--XTab; PrintTab(fd, XTab); fprintf(fd, "}\n");
 		//sprintf(texpath, "%s%02d.png", FPath, count);
@@ -1678,9 +1697,9 @@ bool CModel::outputTex(char* FPath, char* FName, FILE* fd)
 	while (pMaterial != NULL)
 	{
 		fprintf(fd, "    \"texture%s%02d\" col(1.000 1.000 1.000 1.000)", FName, count);
-		fprintf(fd, " dif(1.000) amb(0.250) emi(0.250) spc(0.000) power(5.00) tex(\"%s%02d.dds\")\n", FName, count);
-		sprintf(texpath, "%s%02d.dds", FPath, count);
-		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); D3DX11SaveTextureToFile(GetContext(),pRes,D3DX11_IFF_DDS,texpath); pRes->Release(); } }
+		fprintf(fd, " dif(1.000) amb(0.250) emi(0.250) spc(0.000) power(5.00) tex(\"%s%02d.png\")\n", FName, count);
+		sprintf(texpath, "%s%02d.png", FPath, count);
+		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); SaveTextureToPNG(texpath, pRes); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
 		count++;
 	}
