@@ -108,8 +108,6 @@ float4 main(PS_INPUT input) : SV_TARGET
     float3 V = normalize(eyePos.xyz - input.worldPos);
 
     float4 tex = g_texDiffuse.Sample(g_samLinear, input.texcoord);
-    if (all(tex == 0.0f))
-        tex = float4(1.0f, 1.0f, 1.0f, 1.0f);
     clip(tex.a - 0.5f);
 
     float diffuse  = ComputeHalfLambert(N, L);
