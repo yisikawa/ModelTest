@@ -108,7 +108,7 @@ float4 main(PS_INPUT input) : SV_TARGET
     float3 V = normalize(eyePos.xyz - input.worldPos);
 
     float4 tex = g_texDiffuse.Sample(g_samLinear, input.texcoord);
-    clip(tex.a - 0.5f);
+    clip(tex.a - 0.1f);
 
     float diffuse  = ComputeHalfLambert(N, L);
     float specular = ComputeBlinnSpecular(N, L, V);
