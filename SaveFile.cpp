@@ -215,6 +215,148 @@ void CModel::OptimizeVertices(bool enable) {
 	}
 }
 
+void CModel::OptimizeVerticesForMesh(CMesh* pMesh, MeshContext& ctx, bool enable)
+{
+	const float GRID_SIZE = 0.01f;
+	const float THRESHOLD_SQ = 0.0001f * 0.0001f;
+
+	ctx.vertexRemap.assign(pMesh->m_NumVertices, -1);
+	ctx.weldedVertices.clear();
+
+	std::unordered_map<long long, std::vector<int>> spatialHash;
+
+	// === Phase 1: 頂点の結合 ===
+	CUSTOMVERTEX* pV1 = pMesh->m_pCPUVertices;
+	CUSTOMVERTEX* pV2 = pMesh->m_pCPUVertices2;
+	for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
+		D3DXVECTOR3 vert(pV1->p.x, pV1->p.y, pV1->p.z);
+
+		if (fabs(vert.x) > 10000.0 || fabs(vert.y) > 10000.0 || fabs(vert.z) > 10000.0) {
+			vert.x = 0; vert.y = 0; vert.z = 0;
+			pV1->u = 0; pV1->v = 0;
+		}
+
+		float u = (pV1->u < 0.0f) ? 0.0f : (pV1->u > 1.0f ? 1.0f : pV1->u);
+		float v = (pV1->v < 0.0f) ? 0.0f : (pV1->v > 1.0f ? 1.0f : pV1->v);
+
+		float b1_1 = pV1->b1;
+		int global_bone_1 = (b1_1 > 0.0f) ? pMesh->m_pBoneTbl[pV1->indx] : -1;
+		float b1_2 = pV2->b1;
+		int global_bone_2 = (b1_2 > 0.0f) ? pMesh->m_pBoneTbl[pV2->indx] : -1;
+
+		long long hx = (long long)std::floor(vert.x / GRID_SIZE);
+		long long hy = (long long)std::floor(vert.y / GRID_SIZE);
+		long long hz = (long long)std::floor(vert.z / GRID_SIZE);
+
+		int foundIndex = -1;
+		if (enable) {
+			for (long long dx = -1; dx <= 1 && foundIndex == -1; dx++) {
+				for (long long dy = -1; dy <= 1 && foundIndex == -1; dy++) {
+					for (long long dz = -1; dz <= 1 && foundIndex == -1; dz++) {
+						long long hashKey = ((hx + dx) * 73856093LL) ^ ((hy + dy) * 19349663LL) ^ ((hz + dz) * 83492791LL);
+						if (spatialHash.count(hashKey)) {
+							for (int idx : spatialHash[hashKey]) {
+								const WELDED_VERTEX& uvtx = ctx.weldedVertices[idx];
+								if (D3DXVec3LengthSq(&(vert - uvtx.p)) <= THRESHOLD_SQ) {
+									if (fabs(u - uvtx.u) <= 0.0001f && fabs(v - uvtx.v) <= 0.0001f) {
+										if (fabs(b1_1 - uvtx.weights[0]) <= 0.0001f && fabs(b1_2 - uvtx.weights[1]) <= 0.0001f &&
+											global_bone_1 == uvtx.globalBones[0] && global_bone_2 == uvtx.globalBones[1]) {
+											foundIndex = idx;
+											break;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if (foundIndex == -1) {
+			foundIndex = (int)ctx.weldedVertices.size();
+			WELDED_VERTEX newVtx;
+			newVtx.p = vert;
+			newVtx.n = D3DXVECTOR3(0, 0, 0);
+			newVtx.u = u;
+			newVtx.v = v;
+			newVtx.weights[0] = b1_1;
+			newVtx.weights[1] = b1_2;
+			newVtx.globalBones[0] = global_bone_1;
+			newVtx.globalBones[1] = global_bone_2;
+			newVtx.originalIndex = i;
+			ctx.weldedVertices.push_back(newVtx);
+
+			long long hashKey = (hx * 73856093LL) ^ (hy * 19349663LL) ^ (hz * 83492791LL);
+			spatialHash[hashKey].push_back(foundIndex);
+		}
+		ctx.vertexRemap[i] = foundIndex;
+	}
+
+	// === Phase 2: 面のジオメトリから法線を計算 ===
+	WORD* pIndex = pMesh->m_pCPUIndices;
+	int dispCheck = pMesh->GetDispCheck();
+	CStream* pStream = (CStream*)pMesh->m_Streams.Top();
+	while (pStream != NULL) {
+		int dispLevel = pStream->GetDispLevel();
+		if (g_mPCFlag && dispLevel != 0 && dispLevel < dispCheck) {
+			pStream = (CStream*)pStream->Next;
+			continue;
+		}
+		WORD* pI = pIndex + pStream->GetIndexStart();
+		int i1, i2, i3, t1, t2, t3;
+		if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
+			i1 = *pI++; i2 = *pI++;
+			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
+				i3 = *pI++;
+				if (i % 2) {
+					if (pMesh->m_FlipFlag) { t1 = i3; t2 = i2; t3 = i1; }
+					else                   { t1 = i1; t2 = i2; t3 = i3; }
+				} else {
+					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
+					else                   { t1 = i3; t2 = i2; t3 = i1; }
+				}
+				int w1 = ctx.vertexRemap[t1];
+				int w2 = ctx.vertexRemap[t2];
+				int w3 = ctx.vertexRemap[t3];
+				if (w1 != w2 && w2 != w3 && w1 != w3) {
+					D3DXVECTOR3 edge1 = ctx.weldedVertices[w2].p - ctx.weldedVertices[w1].p;
+					D3DXVECTOR3 edge2 = ctx.weldedVertices[w3].p - ctx.weldedVertices[w1].p;
+					D3DXVECTOR3 faceNormal;
+					D3DXVec3Cross(&faceNormal, &edge1, &edge2);
+					ctx.weldedVertices[w1].n += faceNormal;
+					ctx.weldedVertices[w2].n += faceNormal;
+					ctx.weldedVertices[w3].n += faceNormal;
+				}
+				i1 = i2; i2 = i3;
+			}
+		} else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
+			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
+				i1 = *pI++; i2 = *pI++; i3 = *pI++;
+				if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
+				else                   { t1 = i3; t2 = i2; t3 = i1; }
+				int w1 = ctx.vertexRemap[t1];
+				int w2 = ctx.vertexRemap[t2];
+				int w3 = ctx.vertexRemap[t3];
+				if (w1 != w2 && w2 != w3 && w1 != w3) {
+					D3DXVECTOR3 edge1 = ctx.weldedVertices[w2].p - ctx.weldedVertices[w1].p;
+					D3DXVECTOR3 edge2 = ctx.weldedVertices[w3].p - ctx.weldedVertices[w1].p;
+					D3DXVECTOR3 faceNormal;
+					D3DXVec3Cross(&faceNormal, &edge1, &edge2);
+					ctx.weldedVertices[w1].n += faceNormal;
+					ctx.weldedVertices[w2].n += faceNormal;
+					ctx.weldedVertices[w3].n += faceNormal;
+				}
+			}
+		}
+		pStream = (CStream*)pStream->Next;
+	}
+
+	// === Phase 3: 法線の正規化 ===
+	for (auto& vtx : ctx.weldedVertices) {
+		D3DXVec3Normalize(&vtx.n, &vtx.n);
+	}
+}
+
 bool CModel::outputFBXVertex(FbxMesh * pfbxMesh)
 {
 	D3DXMATRIX rootMatrix, mat;
@@ -328,6 +470,86 @@ bool CModel::outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterial
 
 }
 
+bool CModel::outputFBXVertexForMesh(FbxMesh* pfbxMesh, const MeshContext& ctx)
+{
+	D3DXMATRIX rootMatrix, mat;
+	D3DXMatrixRotationY(&mat, (float)(PAI / 2.));
+	D3DXMatrixRotationX(&rootMatrix, (float)PAI);
+	rootMatrix *= mat;
+
+	FbxGeometryElementNormal* normalElement = pfbxMesh->CreateElementNormal();
+	normalElement->SetMappingMode(FbxGeometryElement::eByControlPoint);
+	normalElement->SetReferenceMode(FbxGeometryElement::eDirect);
+	FbxGeometryElementUV* uvElement = pfbxMesh->CreateElementUV("UVSet");
+	uvElement->SetMappingMode(FbxGeometryElement::eByControlPoint);
+	uvElement->SetReferenceMode(FbxGeometryElement::eDirect);
+
+	pfbxMesh->InitControlPoints((int)ctx.weldedVertices.size());
+	for (size_t i = 0; i < ctx.weldedVertices.size(); i++) {
+		D3DXVECTOR3 vert = ctx.weldedVertices[i].p;
+		D3DXVec3TransformCoord(&vert, &vert, &rootMatrix);
+
+		D3DXVECTOR3 norm = ctx.weldedVertices[i].n;
+		D3DXVec3TransformNormal(&norm, &norm, &rootMatrix);
+
+		pfbxMesh->SetControlPointAt(FbxVector4(vert.x, vert.y, vert.z), (int)i);
+		normalElement->GetDirectArray().Add(FbxVector4(norm.x, norm.y, norm.z));
+		uvElement->GetDirectArray().Add(FbxVector2(ctx.weldedVertices[i].u, 1.0 - ctx.weldedVertices[i].v));
+	}
+	return true;
+}
+
+bool CModel::outputFBXFaceForMesh(FbxMesh* pfbxMesh, CMesh* pMesh,
+                                   FbxLayerElementMaterial* pMatElem, const MeshContext& ctx)
+{
+	WORD* pIndex = pMesh->m_pCPUIndices;
+	int dispCheck = pMesh->GetDispCheck();
+	CStream* pStream = (CStream*)pMesh->m_Streams.Top();
+	while (pStream != NULL) {
+		int dispLevel = pStream->GetDispLevel();
+		if (g_mPCFlag && dispLevel != 0 && dispLevel < dispCheck) {
+			pStream = (CStream*)pStream->Next;
+			continue;
+		}
+		WORD* pI = pIndex + pStream->GetIndexStart();
+		int i1, i2, i3, t1, t2, t3;
+		if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) {
+			i1 = *pI++; i2 = *pI++;
+			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
+				i3 = *pI++;
+				if (i % 2) {
+					if (pMesh->m_FlipFlag) { t1 = i3; t2 = i2; t3 = i1; }
+					else                   { t1 = i1; t2 = i2; t3 = i3; }
+				} else {
+					if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
+					else                   { t1 = i3; t2 = i2; t3 = i1; }
+				}
+				pfbxMesh->BeginPolygon();
+				pfbxMesh->AddPolygon(ctx.vertexRemap[t1]);
+				pfbxMesh->AddPolygon(ctx.vertexRemap[t2]);
+				pfbxMesh->AddPolygon(ctx.vertexRemap[t3]);
+				pfbxMesh->EndPolygon();
+				pMatElem->GetIndexArray().Add(pStream->m_texNo);
+				i1 = i2; i2 = i3;
+			}
+		} else if (pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {
+			for (unsigned int i = 0; i < pStream->GetFaceCount(); i++) {
+				i1 = *pI++; i2 = *pI++; i3 = *pI++;
+				if (pMesh->m_FlipFlag) { t1 = i1; t2 = i2; t3 = i3; }
+				else                   { t1 = i3; t2 = i2; t3 = i1; }
+				pfbxMesh->BeginPolygon();
+				pfbxMesh->AddPolygon(ctx.vertexRemap[t1]);
+				pfbxMesh->AddPolygon(ctx.vertexRemap[t2]);
+				pfbxMesh->AddPolygon(ctx.vertexRemap[t3]);
+				pfbxMesh->EndPolygon();
+				pMatElem->GetIndexArray().Add(pStream->m_texNo);
+			}
+		}
+		pStream = (CStream*)pStream->Next;
+	}
+	return true;
+}
+
 FbxAMatrix D3DXM2FbxAM(const D3DXMATRIX& d3dxMatrix)
 {
 	FbxAMatrix fbxMatrix;
@@ -389,6 +611,49 @@ D3DXVECTOR3 D3DXMat2Euler(const D3DXMATRIX& mat)
 
 
 
+
+bool CModel::createFBXBoneNodes(FbxNode* pRootNode, FbxScene* pScene,
+                                 FbxNode*& outRootBoneNode,
+                                 std::vector<FbxNode*>& outBoneNodes,
+                                 FbxPose* bindPose)
+{
+	D3DXQUATERNION q(0., 0., 0., 1.);
+	D3DXVECTOR3 t, s, r;
+	FbxMatrix aMat; aMat.SetIdentity();
+
+	// ルートボーン作成
+	FbxNode* pRBoneNode = FbxNode::Create(pScene, "Scene_Root");
+	FbxSkeleton* pRBoneAttr = FbxSkeleton::Create(pScene, "RootBoneSkel");
+	pRBoneAttr->SetSkeletonType(FbxSkeleton::eLimbNode);
+	pRBoneNode->SetNodeAttribute(pRBoneAttr);
+	pRBoneNode->LclRotation.Set(FbxDouble3(-180., -90., 0.));
+	pRootNode->AddChild(pRBoneNode);
+	bindPose->Add(pRBoneNode, aMat);
+	outRootBoneNode = pRBoneNode;
+
+	// 各ボーンノード作成
+	for (int i = 0; i < m_nBone; i++) {
+		sprintf(m_Bones[i].m_Name, "Bone%03d", i);
+		FbxNode* pCBoneNode = FbxNode::Create(pScene, m_Bones[i].m_Name);
+		outBoneNodes.push_back(pCBoneNode);
+		FbxSkeleton* pCBoneAttr = FbxSkeleton::Create(pScene, (string(m_Bones[i].m_Name) + "_Skel").c_str());
+		pCBoneAttr->SetSkeletonType(FbxSkeleton::eLimbNode);
+		pCBoneNode->SetNodeAttribute(pCBoneAttr);
+		pCBoneNode->RotationOrder.Set(fbxsdk::FbxEuler::eEulerXYZ);
+		t = D3DXMat2Trans(m_Bones[i].m_mTransform);
+		s = D3DXMat2Scale(m_Bones[i].m_mTransform);
+		r = D3DXMat2Euler(m_Bones[i].m_mTransform);
+		pCBoneNode->LclTranslation.Set(FbxVector4(t.x, t.y, t.z));
+		pCBoneNode->LclScaling.Set(FbxVector4(s.x, s.y, s.z));
+		pCBoneNode->LclRotation.Set(FbxVector4(r.x, r.y, r.z));
+		if (m_Bones[i].m_mParent >= 0) {
+			(i == 0) ? pRBoneNode->AddChild(pCBoneNode) : outBoneNodes[m_Bones[i].m_mParent]->AddChild(pCBoneNode);
+		}
+		bindPose->Add(pCBoneNode, pCBoneNode->EvaluateGlobalTransform());
+	}
+	// pScene->AddPose は saveFBX がループ後に1回だけ呼ぶ
+	return true;
+}
 
 bool CModel::outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh* pMesh)
 {
@@ -484,7 +749,80 @@ bool CModel::SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo) {
 	return true;
 }
 
-bool CModel::outputFBXAnimation(FbxScene* pScene) 
+int CModel::countBone2VerForMesh(int boneNo, const MeshContext& ctx)
+{
+	int cnt = 0;
+	for (const auto& vtx : ctx.weldedVertices) {
+		if ((vtx.weights[0] > 0.f && vtx.globalBones[0] == boneNo) ||
+			(vtx.weights[1] > 0.f && vtx.globalBones[1] == boneNo)) {
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
+bool CModel::SetFBXBone2VerNoForMesh(FbxCluster* pCluster, int boneNo,
+                                      CMesh* pMesh, const MeshContext& ctx)
+{
+	std::vector<bool> addedMap(ctx.vertexRemap.size(), false);
+	CUSTOMVERTEX* pV1 = pMesh->m_pCPUVertices;
+	CUSTOMVERTEX* pV2 = pMesh->m_pCPUVertices2;
+	for (unsigned int i = 0; i < pMesh->m_NumVertices; i++, pV1++, pV2++) {
+		int uniqueInd = ctx.vertexRemap[i];
+		if (addedMap[uniqueInd]) continue;
+		if (pV1->b1 > 0.f && pMesh->m_pBoneTbl[pV1->indx] == boneNo) {
+			float w = pV1->b1 < 0.f ? 0.f : (pV1->b1 > 1.f ? 1.f : pV1->b1);
+			pCluster->AddControlPointIndex(uniqueInd, w);
+			addedMap[uniqueInd] = true;
+		} else if (pV2->b1 > 0.f && pMesh->m_pBoneTbl[pV2->indx] == boneNo) {
+			float w = pV2->b1 < 0.f ? 0.f : (pV2->b1 > 1.f ? 1.f : pV2->b1);
+			pCluster->AddControlPointIndex(uniqueInd, w);
+			addedMap[uniqueInd] = true;
+		}
+	}
+	return true;
+}
+
+bool CModel::attachFBXSkinToMesh(FbxScene* pScene, FbxMesh* pfbxMesh, CMesh* srcMesh,
+                                  int meshIdx, FbxNode* rootBoneNode,
+                                  const std::vector<FbxNode*>& boneNodes,
+                                  const MeshContext& ctx)
+{
+	FbxAMatrix fMat, rMat;
+	D3DXQUATERNION q(0., 0., 0., 1.);
+	FbxQuaternion qq(0., 0., 0., 1.);
+	D3DXVECTOR3 t, s;
+
+	rMat = rootBoneNode->EvaluateLocalTransform();
+
+	char skinName[64];
+	sprintf(skinName, "SkinDeformer_M%03d", meshIdx);
+	FbxSkin* pSkin = FbxSkin::Create(pScene, skinName);
+	pfbxMesh->AddDeformer(pSkin);
+
+	for (int i = 0; i < m_nBone; i++) {
+		if (countBone2VerForMesh(i, ctx) <= 0) continue;
+
+		t = D3DXMat2Trans(m_Bones[i].m_mInvTrans);
+		s = D3DXMat2Scale(m_Bones[i].m_mInvTrans);
+		D3DXQuaternionRotationMatrix(&q, &m_Bones[i].m_mInvTrans);
+		qq.Set(q.x, q.y, q.z, q.w);
+		fMat.SetTQS(FbxVector4(t.x, t.y, t.z), qq, FbxVector4(s.x, s.y, s.z));
+
+		char clusterName[64];
+		sprintf(clusterName, "%s_Skin_M%03d", m_Bones[i].m_Name, meshIdx);
+		FbxCluster* pCluster = FbxCluster::Create(pScene, clusterName);
+		pCluster->SetLink(boneNodes[i]);
+		pCluster->SetLinkMode(FbxCluster::eTotalOne);
+		SetFBXBone2VerNoForMesh(pCluster, i, srcMesh, ctx);
+		pCluster->SetTransformMatrix(rMat.Inverse() * boneNodes[i]->EvaluateGlobalTransform() * fMat);
+		pCluster->SetTransformLinkMatrix(boneNodes[i]->EvaluateGlobalTransform());
+		pSkin->AddCluster(pCluster);
+	}
+	return true;
+}
+
+bool CModel::outputFBXAnimation(FbxScene* pScene)
 {
 	D3DXQUATERNION q(0., 0., 0., 1.);
 	FbxQuaternion qq(0., 0., 0., 1.);
@@ -710,66 +1048,78 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	sceneInfo->mRevision.Append("rev.1.0", strlen("rev.1.0"));
 	sceneInfo->mComment.Append("Thanks", strlen("Thanks"));
 
-	// メッシュノードの作成
-	FbxNode* rootNode = fbxScene->GetRootNode();// ルートノードの取得
-	FbxNode* meshNode = FbxNode::Create(fbxScene, "ewhNode");
-	FbxMesh* cubeMesh = FbxMesh::Create(fbxScene, "ewhMesh");	// --- メッシュの作成 ---
-	meshNode->SetNodeAttribute(cubeMesh);
-	rootNode->AddChild(meshNode);
+	FbxNode* rootNode = fbxScene->GetRootNode();
 	strcpy(fpath, FPath);
 	if ((ptr = strrstr(fpath, FName))) *ptr = '\0';
-	// マテリアル属性　設定
-	// マテリアル作成
+
+	// マテリアル作成（全体で1回、fbxMaterials に収集）
+	std::vector<FbxSurfacePhong*> fbxMaterials;
 	CMaterial* pMaterial = (CMaterial*)m_Materials.Top();
-	while (pMaterial != NULL)
-	{
-		//strcpy(texName, pMaterial->m_Name);
+	while (pMaterial != NULL) {
 		strcpynosp(texName, pMaterial->m_Name);
 		Trim(texName);
 		sprintf(texpath, "%s%s.png", fpath, texName);
-		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_"+string(texName)).c_str());
+		FbxSurfacePhong* material = FbxSurfacePhong::Create(fbxScene, ("Mat_" + string(texName)).c_str());
 		material->Ambient.Set(FbxDouble3(0., 0., 0.));
 		material->Diffuse.Set(FbxDouble3(1., 1., 1.));
 		material->Specular.Set(FbxDouble3(0., 0., 0.));
 		material->ShadingModel.Set("Phong");
 		FbxFileTexture* texture = FbxFileTexture::Create(fbxScene, ("Tex_" + string(texName)).c_str());
-		texture->SetFileName((string(texName)+".png").c_str()); // テクスチャファイルパス設定
+		texture->SetFileName((string(texName) + ".png").c_str());
 		texture->SetRelativeFileName((string(texName) + ".png").c_str());
-        texture->SetTextureUse(FbxTexture::eStandard);
-        texture->SetMappingType(FbxTexture::eUV);
-        texture->SetMaterialUse(FbxFileTexture::eModelMaterial); 
-
-        // マテリアルのDiffuseチャンネルにテクスチャを接続
-        material->Diffuse.ConnectSrcObject(texture);
-        //material->DiffuseFactor.Set(1.0); // Diffuse Factor を 1.0 に設定 (テクスチャをそのまま表示)
-		// マテリアルをメッシュノードにアサイン
-		meshNode->AddMaterial(material);
-		//fbxScene->AddMaterial(material);
-		{ if(pMaterial->m_pTexture){ ID3D11Resource* pRes=nullptr; pMaterial->m_pTexture->GetResource(&pRes); SaveTextureToPNG(texpath, pRes); pRes->Release(); } }
+		texture->SetTextureUse(FbxTexture::eStandard);
+		texture->SetMappingType(FbxTexture::eUV);
+		texture->SetMaterialUse(FbxFileTexture::eModelMaterial);
+		material->Diffuse.ConnectSrcObject(texture);
+		fbxMaterials.push_back(material);
+		{ if (pMaterial->m_pTexture) { ID3D11Resource* pRes = nullptr; pMaterial->m_pTexture->GetResource(&pRes); SaveTextureToPNG(texpath, pRes); pRes->Release(); } }
 		pMaterial = (CMaterial*)pMaterial->Next;
-
 	}
 
-	// メッシュへのマテリアル割り当て
-	// FbxLayer* pLayer = cubeMesh->GetLayer(0);
-	FbxLayer* pLayer = cubeMesh->GetLayer(0);
-	if (!pLayer)
-	{
-		cubeMesh->CreateLayer();
-		pLayer = cubeMesh->GetLayer(0);
+	// ボーンノード作成（全体で1回）
+	std::vector<FbxNode*> boneNodes;
+	FbxNode* rootBoneNode = nullptr;
+	FbxPose* bindPose = FbxPose::Create(fbxScene, "BindPose");
+	bindPose->SetIsBindPose(true);
+	createFBXBoneNodes(rootNode, fbxScene, rootBoneNode, boneNodes, bindPose);
+
+	// メッシュごとに FbxNode / FbxMesh を作成
+	CMesh* pMeshIter = (CMesh*)m_Meshs.Top();
+	int meshIdx = 0;
+	while (pMeshIter != NULL) {
+		char nodeName[64];
+		sprintf(nodeName, "Mesh%03d", meshIdx);
+
+		FbxNode* meshNode = FbxNode::Create(fbxScene, nodeName);
+		FbxMesh* fbxMesh  = FbxMesh::Create(fbxScene, (string(nodeName) + "_Geo").c_str());
+		meshNode->SetNodeAttribute(fbxMesh);
+		rootNode->AddChild(meshNode);
+
+		// 全マテリアルを同順で追加（pStream->m_texNo がそのままインデックスになる）
+		for (auto* mat : fbxMaterials) {
+			meshNode->AddMaterial(mat);
+		}
+
+		FbxLayer* pLayer = fbxMesh->GetLayer(0);
+		if (!pLayer) { fbxMesh->CreateLayer(); pLayer = fbxMesh->GetLayer(0); }
+		FbxLayerElementMaterial* pMatElem = FbxLayerElementMaterial::Create(fbxMesh, "Material");
+		pMatElem->SetMappingMode(FbxLayerElement::eByPolygon);
+		pMatElem->SetReferenceMode(FbxLayerElement::eIndexToDirect);
+
+		MeshContext ctx;
+		OptimizeVerticesForMesh(pMeshIter, ctx, true);
+		outputFBXVertexForMesh(fbxMesh, ctx);
+		outputFBXFaceForMesh(fbxMesh, pMeshIter, pMatElem, ctx);
+		pLayer->SetMaterials(pMatElem);
+
+		if (rootBoneNode) {
+			attachFBXSkinToMesh(fbxScene, fbxMesh, pMeshIter, meshIdx, rootBoneNode, boneNodes, ctx);
+		}
+
+		pMeshIter = (CMesh*)pMeshIter->Next;
+		meshIdx++;
 	}
-
-	FbxLayerElementMaterial* pMaterialElement = FbxLayerElementMaterial::Create(cubeMesh, "Material");
-	pMaterialElement->SetMappingMode(FbxLayerElement::eByPolygon); // ポリゴンごとにマテリアルを割り当てる
-	pMaterialElement->SetReferenceMode(FbxLayerElement::eIndexToDirect); // インデックスで直接マテリアルを参照
-	//頂点の出力
-	outputFBXVertex(cubeMesh);
-	//面の出力
-	outputFBXFace(cubeMesh, pMaterialElement);
-
-	pLayer->SetMaterials(pMaterialElement);
-	//	ボーン出力
-	outputFBXBone(rootNode, fbxScene, cubeMesh);
+	fbxScene->AddPose(bindPose);
 	std::vector<std::string> strlist;
 	strlist.clear();
 	//　アニメーション出力

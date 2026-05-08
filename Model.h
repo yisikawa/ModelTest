@@ -509,6 +509,11 @@ struct WELDED_VERTEX {
 	int originalIndex;
 };
 
+struct MeshContext {
+	std::vector<int>           vertexRemap;    // [localVertexIdx] -> weldedIdx (0-based per mesh)
+	std::vector<WELDED_VERTEX> weldedVertices; // このメッシュ専用のユニーク頂点
+};
+
 typedef class CModel : public CData
 {
 protected:
@@ -582,6 +587,23 @@ public:
 	virtual bool    outputVerFace( FILE *fd, int partsNo, int type );
 	virtual int		countParts( int partsNo );
 	virtual bool    ConvertMesh(void);
+
+	// per-mesh FBX出力（マルチメッシュ対応）
+	virtual void OptimizeVerticesForMesh(CMesh* pMesh, MeshContext& ctx, bool enable);
+	virtual bool outputFBXVertexForMesh(FbxMesh* pfbxMesh, const MeshContext& ctx);
+	virtual bool outputFBXFaceForMesh(FbxMesh* pfbxMesh, CMesh* pMesh,
+	                                   FbxLayerElementMaterial* pMatElem, const MeshContext& ctx);
+	virtual bool createFBXBoneNodes(FbxNode* pRootNode, FbxScene* pScene,
+	                                 FbxNode*& outRootBoneNode,
+	                                 std::vector<FbxNode*>& outBoneNodes,
+	                                 FbxPose* bindPose);
+	virtual bool attachFBXSkinToMesh(FbxScene* pScene, FbxMesh* pfbxMesh, CMesh* srcMesh,
+	                                  int meshIdx, FbxNode* rootBoneNode,
+	                                  const std::vector<FbxNode*>& boneNodes,
+	                                  const MeshContext& ctx);
+	virtual bool SetFBXBone2VerNoForMesh(FbxCluster* pCluster, int boneNo,
+	                                      CMesh* pMesh, const MeshContext& ctx);
+	virtual int  countBone2VerForMesh(int boneNo, const MeshContext& ctx);
 } CModel, *LPCModel;
 
 //======================================================================
