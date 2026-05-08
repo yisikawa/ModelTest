@@ -1215,7 +1215,7 @@ bool CPC::LoadPCParts()
 	GetFileNameFromDno(FileName,GetRightWeapon());
 	if( CountTextureFromFile( FileName ) > 0 ) {
 		hr = LoadTextureFromFile( FileName );
-		hr = LoadMeshFromFile( FileName, FVF, 0 );
+		hr = LoadMeshFromFile( FileName, FVF, 7 );
 	}
 	SetInfoRWeapon( LoadInfoFromFile( FileName , 0x13 ) );
 	SetInfoRWeapon2( LoadInfoFromFile( FileName , 0x16 ) );
@@ -1223,7 +1223,7 @@ bool CPC::LoadPCParts()
 	GetFileNameFromDno(FileName,GetLeftWeapon());
 	if( CountTextureFromFile( FileName ) > 0 ) {
 		hr = LoadTextureFromFile( FileName );
-		hr = LoadMeshFromFile( FileName, FVF, 0 );
+		hr = LoadMeshFromFile( FileName, FVF, 8 );
 	}
 	SetInfoLWeapon( LoadInfoFromFile( FileName , 0x15 ) );
 	SetInfoLWeapon2( LoadInfoFromFile( FileName , 0x13 ) );
@@ -1231,7 +1231,7 @@ bool CPC::LoadPCParts()
 	GetFileNameFromDno(FileName,GetRemoteWeapon());
 	if( CountTextureFromFile( FileName ) > 0 ) {
 		hr = LoadTextureFromFile( FileName );
-		hr = LoadMeshFromFile( FileName, FVF, 0 );
+		hr = LoadMeshFromFile( FileName, FVF, 9 );
 	}
 	CMesh *pMesh1;
 	CMesh *pMesh2;
