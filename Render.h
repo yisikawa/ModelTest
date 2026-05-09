@@ -31,12 +31,20 @@ extern float       g_mLightDist;
 extern D3DXVECTOR3 g_mLightPosition;
 
 //======================================================================
+// アニメーション再生状態（Render.cpp で定義）
+//======================================================================
+extern bool  g_mAnimPlaying;
+extern float g_mAnimStep;
+
+//======================================================================
 // PROTOTYPE
 //======================================================================
-bool InitRender( void );
-void UnInitRender( void );
-void Rendering( void );
-bool Create3DSpace( void );
+bool    InitRender( void );
+void    UnInitRender( void );
+void    Rendering( void );
+bool    Create3DSpace( void );
+class   CModel;
+CModel* GetActiveModel();
 
 struct ID3D11RasterizerState;
 ID3D11RasterizerState* GetRasterizerNormal( void );

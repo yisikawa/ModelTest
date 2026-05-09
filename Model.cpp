@@ -637,11 +637,8 @@ float CModel::MaxMotionTime( void )
 	float Time,MaxTime = 0.f;
 
 	for( int i=0 ; i<m_nBone ; i++ ) {
-		CMotionElement *pAnime = m_Bones[i].m_pMotion;
-		if ( pAnime != NULL ) {
-			Time = pAnime->GetFinalTime();
-			MaxTime =MaxTime > Time ? MaxTime:Time;
-		}
+		Time = m_MotionArray[i].GetFinalTime();
+		MaxTime = MaxTime > Time ? MaxTime : Time;
 	}
 	return MaxTime;
 }

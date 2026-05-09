@@ -4,6 +4,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "WinMain.h"
 #include "Dx.h"
 #include "Render.h"
@@ -740,6 +741,26 @@ bool ChangeInventory( HWND in_hWnd, char* RaceName )
 
 
  //　種族、装備等　イベント処理
+static void UpdateAnimControlState(HWND hWnd) {
+	CModel* model = GetActiveModel();
+	if (!model) return;
+	float maxT = model->MaxMotionTime();
+	float curT = model->GetTime();
+	float viewT = curT;
+	int sliderMax = maxT > 1.0f ? (int)maxT - 1 : 0;
+	if (maxT > 0.0f) {
+		viewT = fmodf(curT, maxT);
+		if (viewT < 0.0f) viewT = 0.0f;
+		if (viewT > (float)sliderMax) viewT = (float)sliderMax;
+	}
+	SetWindowText(GetDlgItem(hWnd, IDC_BTN_ANIM_PLAY), g_mAnimPlaying ? "Pause" : "Play");
+	SendDlgItemMessage(hWnd, IDC_SLIDER_ANIM, TBM_SETRANGE, TRUE, MAKELPARAM(0, sliderMax));
+	SendDlgItemMessage(hWnd, IDC_SLIDER_ANIM, TBM_SETPOS,   TRUE, (int)viewT);
+	char buf[64];
+	wsprintfA(buf, "%d / %d", (int)viewT, (int)maxT);
+	SetWindowText(GetDlgItem(hWnd, IDC_STATIC_ANIM_TIME), buf);
+}
+
 LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM in_lParam )
 {
 	char	ComboString[128],RaceName[32];
@@ -863,7 +884,12 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 				fclose(fd);
 			}
 			SendMessage(GetDlgItem(in_hWnd, IDC_COMBO31), CB_SETCURSEL, (WPARAM)0, 0L);
+			SetTimer(in_hWnd, IDC_TIMER_ANIM, 100, NULL);
 			break;
+		case WM_TIMER:
+			if (in_wParam == IDC_TIMER_ANIM)
+				UpdateAnimControlState(in_hWnd);
+			return 0;
  		case WM_COMMAND:
 			switch( LOWORD(in_wParam ) ) {
 				case IDC_COMBO1:
@@ -971,6 +997,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO8), ComboString, sizeof(ComboString));
 						pPC->SetMotionName(ComboString);
 						pPC->LoadPCMotion();
+						UpdateAnimControlState(in_hWnd);
 					}
 					break;
 				case IDC_COMBO9:
@@ -979,6 +1006,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 						GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO9), ComboString, sizeof(ComboString));
 						pNPC->SetMotionName(ComboString);
 						pNPC->LoadNPCMotion();
+						UpdateAnimControlState(in_hWnd);
 					}
 					break;
 				case IDC_COMBO10:
@@ -1138,11 +1166,13 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 				case IDC_RADIO8:
 					if( IsDlgButtonChecked(in_hWnd, IDC_RADIO8) == BST_CHECKED) {
 						g_mPCFlag = true;
+						UpdateAnimControlState(in_hWnd);
 					}
 					break;
 				case IDC_RADIO9:
 					if( IsDlgButtonChecked(in_hWnd, IDC_RADIO9) == BST_CHECKED) {
 						g_mPCFlag = false;
+						UpdateAnimControlState(in_hWnd);
 					}
 					break;
 				case IDC_CHECK1:
@@ -1187,11 +1217,59 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					}
 					break;
 					GetWindowText(GetDlgItem(in_hWnd, IDC_COMBO10), ComboString, sizeof(ComboString));
+				case IDC_BTN_ANIM_PLAY:
+					g_mAnimPlaying = !g_mAnimPlaying;
+					UpdateAnimControlState(in_hWnd);
+					break;
+				case IDC_BTN_ANIM_PREV:
+					g_mAnimPlaying = false;
+					{
+						float maxT = GetActiveModel()->MaxMotionTime();
+						float cur  = maxT > 0.0f ? fmodf(GetActiveModel()->GetTime(), maxT)
+						                          : GetActiveModel()->GetTime();
+						float t    = cur - g_mAnimStep;
+						GetActiveModel()->SetTime(t < 0.0f ? 0.0f : t);
+					}
+					UpdateAnimControlState(in_hWnd);
+					break;
+				case IDC_BTN_ANIM_NEXT:
+					g_mAnimPlaying = false;
+					{
+						float maxT = GetActiveModel()->MaxMotionTime();
+						if (maxT > 0.0f) {
+							float limit = maxT > 1.0f ? maxT - 1.0f : 0.0f;
+							float cur = fmodf(GetActiveModel()->GetTime(), maxT);
+							float t   = cur + g_mAnimStep;
+							GetActiveModel()->SetTime(t < limit ? t : limit);
+						}
+					}
+					UpdateAnimControlState(in_hWnd);
+					break;
+				case IDC_BTN_ANIM_FIRST:
+					g_mAnimPlaying = false;
+					GetActiveModel()->SetTime(0.0f);
+					UpdateAnimControlState(in_hWnd);
+					break;
+				case IDC_BTN_ANIM_LAST:
+					g_mAnimPlaying = false;
+					{
+						float maxT = GetActiveModel()->MaxMotionTime();
+						GetActiveModel()->SetTime(maxT > 1.0f ? maxT - 1.0f : 0.0f);
+					}
+					UpdateAnimControlState(in_hWnd);
+					break;
 				case IDOK:
 					ShowWindow(in_hWnd,SW_HIDE);
 					break;
 			}
 			break;
+		case WM_HSCROLL:
+			if ((HWND)in_lParam == GetDlgItem(in_hWnd, IDC_SLIDER_ANIM)) {
+				int pos = (int)SendMessage((HWND)in_lParam, TBM_GETPOS, 0, 0);
+				GetActiveModel()->SetTime((float)pos);
+				UpdateAnimControlState(in_hWnd);
+			}
+			return 0;
 		case WM_CLOSE:
 			ShowWindow(in_hWnd,SW_HIDE);
 			break;

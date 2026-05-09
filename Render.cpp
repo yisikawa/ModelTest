@@ -36,6 +36,8 @@ inline DWORD FtoDW( FLOAT f ) { return *((DWORD*)&f); }
 		CPC			*pPC				=	NULL;
 		CNPC		*pNPC				=	NULL;
 		int			g_mMotionSpeed		=	3000;
+		bool		g_mAnimPlaying		=	true;
+		float		g_mAnimStep			=	100.0f;
 extern	HWND		hDlg2;
 float				g_mFov			= PAI / 4.f;
 float				g_mAspect		= 1.4f;
@@ -73,6 +75,10 @@ typedef struct {
 //======================================================================
 //
 
+CModel* GetActiveModel() {
+	return g_mPCFlag ? (CModel*)pPC : (CModel*)pNPC;
+}
+
 void Rendering( void )
 {
 	D3DXVECTOR3		Pos;
@@ -96,7 +102,7 @@ void Rendering( void )
 
 	pPC->GetWorldPosition( Pos );
 	if (g_mPCFlag) {
-		pPC->AddTime(fTime*g_mMotionSpeed);
+		if (g_mAnimPlaying) pPC->AddTime(fTime*g_mMotionSpeed);
 		pPC->DynamicTransform();
 		//pPC->DynamicTransform2();
 		if (g_mDispIdl) {
@@ -112,7 +118,7 @@ void Rendering( void )
 		}
 	}
 	else {
-		pNPC->AddTime( fTime*g_mMotionSpeed );
+		if (g_mAnimPlaying) pNPC->AddTime( fTime*g_mMotionSpeed );
 		pNPC->DynamicTransform();
 		//pNPC->DynamicTransform2();
 		if (g_mDispIdl) {

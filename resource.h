@@ -29,6 +29,14 @@
 #define IDC_RADIO2                      1049
 #define IDC_RADIO3                      1050
 #define IDC_RADIO4                      1051
+#define IDC_BTN_ANIM_FIRST              1052
+#define IDC_BTN_ANIM_PREV               1053
+#define IDC_BTN_ANIM_PLAY               1054
+#define IDC_BTN_ANIM_NEXT               1055
+#define IDC_BTN_ANIM_LAST               1056
+#define IDC_SLIDER_ANIM                 1057
+#define IDC_STATIC_ANIM_TIME            1058
+#define IDC_TIMER_ANIM                  1
 #define ID_MNU_EXIT                     40003
 #define ID_MNU_INVENT                   40147
 #define ID_40261                        40261
