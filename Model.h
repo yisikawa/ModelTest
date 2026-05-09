@@ -514,6 +514,17 @@ struct MeshContext {
 	std::vector<WELDED_VERTEX> weldedVertices; // このメッシュ専用のユニーク頂点
 };
 
+struct PartMeshSource {
+	CMesh*      mesh;
+	MeshContext meshContext;
+	int         baseIndex;
+};
+
+struct PartMeshContext {
+	std::vector<PartMeshSource> sources;
+	std::vector<WELDED_VERTEX>  weldedVertices;
+};
+
 typedef class CModel : public CData
 {
 protected:
@@ -604,6 +615,16 @@ public:
 	virtual bool SetFBXBone2VerNoForMesh(FbxCluster* pCluster, int boneNo,
 	                                      CMesh* pMesh, const MeshContext& ctx);
 	virtual int  countBone2VerForMesh(int boneNo, const MeshContext& ctx);
+
+	// per-parts FBX出力（PartsNo単位でCMeshを集約）
+	virtual void OptimizeVerticesForPart(const std::vector<CMesh*>& meshes, PartMeshContext& ctx, bool enable);
+	virtual bool outputFBXVertexForPart(FbxMesh* pfbxMesh, const PartMeshContext& ctx);
+	virtual bool outputFBXFaceForPart(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMatElem, const PartMeshContext& ctx);
+	virtual int  countBone2VerForPart(int boneNo, const PartMeshContext& ctx);
+	virtual bool SetFBXBone2VerNoForPart(FbxCluster* pCluster, int boneNo, const PartMeshContext& ctx);
+	virtual bool attachFBXSkinToPart(FbxScene* pScene, FbxMesh* pfbxMesh, int partsNo,
+	                                  FbxNode* rootBoneNode, const std::vector<FbxNode*>& boneNodes,
+	                                  const PartMeshContext& ctx);
 } CModel, *LPCModel;
 
 //======================================================================

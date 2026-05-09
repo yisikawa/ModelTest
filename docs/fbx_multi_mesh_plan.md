@@ -218,3 +218,189 @@ int  countBone2VerForMesh(int boneNo, const MeshContext& ctx);
 - **FbxCluster 名の重複**: 複数メッシュで同ボーン名の Cluster を作るため、`meshIdx` をサフィックスに付与してユニーク化が必須
 - **pStream->m_texNo の有効範囲**: 全マテリアルを全 FbxNode に同順で追加するため、texNo がマテリアル総数未満である前提は現状と同じ
 - **アニメーション出力**: ボーンノードを参照するだけなので変更不要
+
+---
+
+## 追加計画: m_PartsNo による CMesh 集約 簡易版
+
+### 背景
+
+Claude による前回実装は、`m_PartsNo` ごとに `Parts_Head` などの親ノードを作成し、既存の `CMesh` 単位の `FbxMesh` をその配下へ移動するだけだった。
+
+そのため、実際のジオメトリは結合されておらず、Blender 上でも期待した「1 PartsNo = 1 Mesh オブジェクト」にはならない。
+
+今回の目的は、まず簡易版として **同じ `m_PartsNo` を持つ複数 `CMesh` を 1 つの `FbxMesh` に単純連結すること** とする。CMesh 間の頂点溶接は行わない。
+
+### 目標
+
+- `m_PartsNo` ごとに 1 つの `FbxNode` / `FbxMesh` を作成する。
+- Blender のアウトライナー上で `Parts_Head`, `Parts_Body`, `Parts_Hand` などが Mesh オブジェクト本体として表示される。
+- 既存のマテリアル割り当て `pStream->m_texNo` を維持する。
+- 既存のボーンノード生成とアニメーション出力は維持する。
+- スキンウェイトは Parts 全体の control point index に変換して出力する。
+
+### 非目標
+
+- CMesh 間の頂点溶接は行わない。
+- 法線や UV が異なる境界の統合は行わない。
+- 左右手足の分割など、PartsNo 以外の追加分類は今回扱わない。
+- 既存 `.x` / `.mqo` 出力処理は変更しない。
+
+### 新規データ構造
+
+`Model.h` に Parts 集約用の context を追加する。
+
+```cpp
+struct PartMeshSource {
+    CMesh* mesh;
+    MeshContext meshContext;
+    int baseIndex;
+};
+
+struct PartMeshContext {
+    std::vector<PartMeshSource> sources;
+    std::vector<WELDED_VERTEX> weldedVertices;
+};
+```
+
+簡易版では、各 `CMesh` に既存の `OptimizeVerticesForMesh` を適用し、その結果を `PartMeshContext::weldedVertices` にオフセット付きで連結する。
+
+### 新規関数
+
+`CModel` に以下を追加する。
+
+```cpp
+void OptimizeVerticesForPart(const std::vector<CMesh*>& meshes,
+                             PartMeshContext& ctx,
+                             bool enable);
+
+bool outputFBXVertexForPart(FbxMesh* pfbxMesh,
+                            const PartMeshContext& ctx);
+
+bool outputFBXFaceForPart(FbxMesh* pfbxMesh,
+                          FbxLayerElementMaterial* pMatElem,
+                          const PartMeshContext& ctx);
+
+int countBone2VerForPart(int boneNo,
+                         const PartMeshContext& ctx);
+
+bool SetFBXBone2VerNoForPart(FbxCluster* pCluster,
+                             int boneNo,
+                             const PartMeshContext& ctx);
+
+bool attachFBXSkinToPart(FbxScene* pScene,
+                         FbxMesh* pfbxMesh,
+                         int partsNo,
+                         FbxNode* rootBoneNode,
+                         const std::vector<FbxNode*>& boneNodes,
+                         const PartMeshContext& ctx);
+```
+
+### saveFBX の変更方針
+
+現在の `saveFBX` は `CMesh` 単位で `FbxNode` / `FbxMesh` を作成している。
+
+```text
+for each CMesh:
+    create Mesh000
+    OptimizeVerticesForMesh
+    outputFBXVertexForMesh
+    outputFBXFaceForMesh
+    attachFBXSkinToMesh
+```
+
+これを `m_PartsNo` 単位の処理に変更する。
+
+```text
+group CMesh by m_PartsNo
+
+for each partsNo:
+    create Parts_xxx node
+    create Parts_xxx_Geo mesh
+    OptimizeVerticesForPart
+    outputFBXVertexForPart
+    outputFBXFaceForPart
+    attachFBXSkinToPart
+```
+
+### 頂点連結ルール
+
+1. `OptimizeVerticesForPart` は、対象 PartsNo の `CMesh` 配列を順に処理する。
+2. 各 `CMesh` に対して既存 `OptimizeVerticesForMesh` を呼び、メッシュ内の重複頂点だけを整理する。
+3. `PartMeshContext::weldedVertices` に追加するとき、現在のサイズを `baseIndex` として保持する。
+4. 面出力時は、各 `CMesh` の `meshContext.vertexRemap[localIndex] + baseIndex` を FBX polygon index として使う。
+
+この方式では CMesh 間の頂点は共有されないが、1 つの `FbxMesh` 内に正しい control point index として連結される。
+
+### 面出力ルール
+
+`outputFBXFaceForPart` は `PartMeshContext::sources` を順に処理する。
+
+- `source.mesh` から `CStream` と index buffer を読む。
+- triangle strip / triangle list の展開ロジックは既存 `outputFBXFaceForMesh` を流用する。
+- `pMatElem->GetIndexArray().Add(pStream->m_texNo)` は既存どおり維持する。
+- 各 source の `baseIndex` を使って、local remap を Parts 全体の index に変換する。
+
+### スキン出力ルール
+
+`attachFBXSkinToPart` は Parts 単位で 1 つの `FbxSkin` を作成する。
+
+- cluster 名は `BoneName_Skin_Parts%d` のように PartsNo を含めて一意にする。
+- `SetFBXBone2VerNoForPart` は全 source を走査する。
+- 各 source で `CMesh::m_pBoneTbl` を使って global bone index を判定する。
+- control point index は `source.meshContext.vertexRemap[i] + source.baseIndex` を使う。
+- 同じ control point への重複追加を避けるため、Parts 全体サイズの `addedMap` を使う。
+
+### Parts 名
+
+既存の名前配列を流用する。
+
+```cpp
+static const char* kPartsName[] = {
+    "Race", "Face", "Head", "Body", "Hand",
+    "Leg", "Foot", "RightWeapon", "LeftWeapon", "RemoteWeapon"
+};
+```
+
+ノード名は以下とする。
+
+```text
+Parts_Face
+Parts_Head
+Parts_Body
+Parts_Hand
+Parts_Leg
+Parts_Foot
+Parts_RightWeapon
+```
+
+範囲外の PartsNo は `Parts_%d` とする。
+
+### 実装手順
+
+1. `Model.h` に `PartMeshSource` / `PartMeshContext` を追加する。
+2. `Model.h` に Parts 集約用関数宣言を追加する。
+3. `SaveFile.cpp` に `OptimizeVerticesForPart` を実装する。
+4. `outputFBXVertexForPart` を実装する。
+5. `outputFBXFaceForPart` を実装する。
+6. `countBone2VerForPart` / `SetFBXBone2VerNoForPart` を実装する。
+7. `attachFBXSkinToPart` を実装する。
+8. `saveFBX` の `CMesh` ループを PartsNo グループループに置き換える。
+9. Debug ビルドでコンパイル確認する。
+10. FBX を出力し、Blender でアウトライナーと表示状態を確認する。
+
+### 確認観点
+
+- Blender のアウトライナーで `Parts_*` が Mesh オブジェクトとして表示されること。
+- `Mesh000` などの CMesh 単位オブジェクトが出力されないこと。
+- 表示位置、姿勢、スケールが従来 FBX と一致すること。
+- テクスチャとマテリアル割り当てが崩れていないこと。
+- Armature による変形が大きく破綻していないこと。
+- アニメーション出力を有効にした場合も既存と同等に動くこと。
+
+### リスク
+
+- スキンウェイトの index オフセットを誤ると、Parts 内の一部頂点だけが別ボーンに引っ張られる。
+- `addedMap` を source 単位で持つと、同じ Parts 内で control point index が衝突する可能性があるため、Parts 全体単位で管理する。
+- `pStream->m_texNo` がマテリアル配列範囲外の場合、既存と同じ前提で壊れる可能性がある。
+- CMesh 間の頂点溶接を行わないため、境界の法線は完全には滑らかにならない。ただし今回の目的である PartsNo 単位のオブジェクト集約には影響しない。
