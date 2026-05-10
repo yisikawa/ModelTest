@@ -1,4 +1,4 @@
-// Microsoft Visual C++ generated resource script.
+Ôªø// Microsoft Visual C++ generated resource script.
 //
 #include "resource.h"
 
@@ -18,7 +18,7 @@
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_JPN)
 LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
-#pragma code_page(932)
+#pragma code_page(65001)
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -27,16 +27,16 @@ LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
 
 IDR_MENU1 MENU
 BEGIN
-    POPUP "ÉtÉ@ÉCÉã(&F)"
+    POPUP "„Éï„Ç°„Ç§„É´(&F)"
     BEGIN
         MENUITEM "SAVEMQO",                       ID_MNU_SAVE
         MENUITEM "SAVEX",                         ID_MNU_SAVEX
         MENUITEM "SAVEFBX",                       ID_MNU_SAVEFBX
-        MENUITEM "èIóπ(&X)",                      ID_MNU_EXIT
+        MENUITEM "ÁµÇ‰∫Ü(&X)",                      ID_MNU_EXIT
     END
-    POPUP "ÉEÉBÉìÉhÉE(&W)"
+    POPUP "„Ç¶„Ç£„É≥„Éâ„Ç¶(&W)"
     BEGIN
-        MENUITEM "éÌë∞ÅEëïîı",                       ID_MNU_INVENT
+        MENUITEM "Á®ÆÊóè„ÉªË£ÖÂÇô",                       ID_MNU_INVENT
     END
 END
 
@@ -83,21 +83,21 @@ END
 
 IDD_DIALOG2 DIALOGEX 5, 100, 153, 380
 STYLE DS_SETFONT | DS_MODALFRAME | DS_SETFOREGROUND | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "éÌë∞ÅEëïîıìô"
-FONT 8, "ÇlÇr ÇoÉSÉVÉbÉN", 400, 0, 0x80
+CAPTION "Á®ÆÊóè„ÉªË£ÖÂÇôÁ≠â"
+FONT 8, "Ôº≠Ôº≥ Ôº∞„Ç¥„Ç∑„ÉÉ„ÇØ", 400, 0, 0x80
 BEGIN
-    RTEXT           "éÌë∞",IDC_STATIC,5,67,16,13,SS_CENTERIMAGE
-    RTEXT           "äÁ",IDC_STATIC,9,87,12,13,SS_CENTERIMAGE
-    RTEXT           "ì™",IDC_STATIC,11,107,10,13,SS_CENTERIMAGE
-    RTEXT           "ì∑",IDC_STATIC,13,129,8,13,SS_CENTERIMAGE
-    RTEXT           "óºéË",IDC_STATIC,6,149,15,13,SS_CENTERIMAGE
-    RTEXT           "óºãr",IDC_STATIC,6,169,15,13,SS_CENTERIMAGE
-    RTEXT           "óºë´",IDC_STATIC,6,189,15,13,SS_CENTERIMAGE
-    RTEXT           "âEéË",IDC_STATIC,7,221,15,13,SS_CENTERIMAGE
-    RTEXT           "ç∂éË",IDC_STATIC,7,239,15,13,SS_CENTERIMAGE
-    RTEXT           "âìäu",IDC_STATIC,7,255,15,13,SS_CENTERIMAGE
-    GROUPBOX        "ëïîıìô",IDC_STATIC,5,55,134,154
-    GROUPBOX        "ïêäÌìô",IDC_STATIC,5,209,134,66
+    RTEXT           "Á®ÆÊóè",IDC_STATIC,5,67,16,13,SS_CENTERIMAGE
+    RTEXT           "È°î",IDC_STATIC,9,87,12,13,SS_CENTERIMAGE
+    RTEXT           "È†≠",IDC_STATIC,11,107,10,13,SS_CENTERIMAGE
+    RTEXT           "ËÉ¥",IDC_STATIC,13,129,8,13,SS_CENTERIMAGE
+    RTEXT           "‰∏°Êâã",IDC_STATIC,6,149,15,13,SS_CENTERIMAGE
+    RTEXT           "‰∏°ËÑö",IDC_STATIC,6,169,15,13,SS_CENTERIMAGE
+    RTEXT           "‰∏°Ë∂≥",IDC_STATIC,6,189,15,13,SS_CENTERIMAGE
+    RTEXT           "Âè≥Êâã",IDC_STATIC,7,221,15,13,SS_CENTERIMAGE
+    RTEXT           "Â∑¶Êâã",IDC_STATIC,7,239,15,13,SS_CENTERIMAGE
+    RTEXT           "ÈÅ†Èöî",IDC_STATIC,7,255,15,13,SS_CENTERIMAGE
+    GROUPBOX        "Ë£ÖÂÇôÁ≠â",IDC_STATIC,5,55,134,154
+    GROUPBOX        "Ê≠¶Âô®Á≠â",IDC_STATIC,5,209,134,66
     COMBOBOX        IDC_COMBO1,29,68,106,243,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     COMBOBOX        IDC_COMBO2,29,88,106,223,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     COMBOBOX        IDC_COMBO3,29,108,106,203,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
