@@ -43,6 +43,7 @@ bool    InitRender( void );
 void    UnInitRender( void );
 void    Rendering( void );
 bool    Create3DSpace( void );
+void    UpdateProjection( void );
 class   CModel;
 CModel* GetActiveModel();
 

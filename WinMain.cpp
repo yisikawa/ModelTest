@@ -21,7 +21,7 @@
 //======================================================================
 // PROTOTYPE
 //======================================================================
-LRESULT CALLBACK WinProc( HWND hWnd, UINT msg, UINT wParam, LONG lParam );
+LRESULT CALLBACK WinProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
 LRESULT CALLBACK Dlg2Proc( HWND,UINT,WPARAM,LPARAM);
 DWORD	ConvertStr2Dno( char* DataName );
 DWORD	ConvertStr2Dno2( char* DataName );
@@ -53,8 +53,12 @@ extern	float			g_mNear_z;			// 最近接距離
 extern	float			g_mFar_z;			// 最遠方距離
 extern  bool			g_mPCFlag;
 extern  int				g_mPCMotion;		// PCのモーション種類
-		long			g_mScreenWidth	= 800;
-		long			g_mScreenHeight	= 600;
+		long			g_mScreenWidth	= 1280;
+		long			g_mScreenHeight	= 720;
+static	bool			g_isFullscreen	= false;
+static	RECT			g_windowedRect	= {};
+static	DWORD			g_windowedStyle	= 0;
+static const float		ASPECT_RATIO	= 16.f / 9.f;
 static	char			*AppName = "EwhM ver0.1";
 static	char			*ClassName = "Model Test";
 static	DWORD			FPS;
@@ -355,7 +359,7 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 				WS_EX_APPWINDOW,
 				ClassName,
 				AppName,
-				WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE ,
+				WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_SIZEBOX | WS_VISIBLE ,
 				GetSystemMetrics(SM_CXSCREEN)/2 - window_w/2,
 				GetSystemMetrics(SM_CYSCREEN)/2 - window_h/2,
 				window_w,
@@ -365,7 +369,7 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 				inst,
 				NULL );
 	// ダイアログ２作成
-	hDlg2 = CreateDialog((HINSTANCE)GetWindowLong(hWindow,GWL_HINSTANCE),MAKEINTRESOURCE(IDD_DIALOG2),NULL,(DLGPROC)Dlg2Proc);
+	hDlg2 = CreateDialog((HINSTANCE)GetWindowLongPtr(hWindow,GWLP_HINSTANCE),MAKEINTRESOURCE(IDD_DIALOG2),NULL,(DLGPROC)Dlg2Proc);
 	InvalidateRect(hDlg2, NULL, TRUE);
 	SetWindowPos( hDlg2,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE );
 	ShowWindow( hDlg2,SW_HIDE );
@@ -1283,10 +1287,42 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 
 //========================================================================
 //
+//		全画面切り替え（F11：ボーダーレスウィンドウ）
+//
+//========================================================================
+static void ToggleFullscreen( HWND hWnd )
+{
+	if ( !g_isFullscreen ) {
+		// ウィンドウモード → ボーダーレス全画面
+		GetWindowRect( hWnd, &g_windowedRect );
+		g_windowedStyle = GetWindowLong( hWnd, GWL_STYLE );
+
+		int sw = GetSystemMetrics( SM_CXSCREEN );
+		int sh = GetSystemMetrics( SM_CYSCREEN );
+
+		SetWindowLong( hWnd, GWL_STYLE, WS_POPUP | WS_VISIBLE );
+		SetWindowPos( hWnd, HWND_TOP, 0, 0, sw, sh, SWP_FRAMECHANGED );
+		g_isFullscreen = true;
+	} else {
+		// ボーダーレス全画面 → ウィンドウモード復元
+		SetWindowLong( hWnd, GWL_STYLE, g_windowedStyle );
+		SetWindowPos( hWnd, nullptr,
+			g_windowedRect.left,
+			g_windowedRect.top,
+			g_windowedRect.right  - g_windowedRect.left,
+			g_windowedRect.bottom - g_windowedRect.top,
+			SWP_FRAMECHANGED );
+		g_isFullscreen = false;
+	}
+}
+
+
+//========================================================================
+//
 //		メッセージ処理
 //
 //========================================================================
-LRESULT CALLBACK WinProc( HWND hWnd, UINT msg, UINT wParam, LONG lParam )
+LRESULT CALLBACK WinProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
 static float	alpha = 0.,beta = 0.;
 static float	Delta=0.,Step=0.2f;
@@ -1340,6 +1376,61 @@ static short	x1=-1,y1=-1,x2,y2;
 	sfbx.lpstrInitialDir = NULL;
 	switch (msg)
 	{
+		//==============================================
+		//	ウィンドウリサイズ中（アスペクト比16:9を強制）
+		//==============================================
+		case WM_SIZING: {
+			RECT* r = (RECT*)lParam;
+			RECT frame = {};
+			AdjustWindowRectEx( &frame,
+				WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_SIZEBOX, FALSE, WS_EX_APPWINDOW );
+			int fw = frame.right  - frame.left;
+			int fh = frame.bottom - frame.top;
+
+			int cw = (r->right  - r->left) - fw;
+			int ch = (r->bottom - r->top)  - fh;
+
+			if ( wParam == WMSZ_TOP || wParam == WMSZ_BOTTOM ) {
+				cw = (int)(ch * ASPECT_RATIO);
+			} else {
+				ch = (int)(cw / ASPECT_RATIO);
+			}
+			if ( cw < 320 ) { cw = 320; ch = (int)(cw / ASPECT_RATIO); }
+
+			// 固定辺を決めてRectを更新
+			if ( wParam == WMSZ_LEFT || wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT ) {
+				r->left = r->right - cw - fw;
+			} else {
+				r->right = r->left + cw + fw;
+			}
+			if ( wParam == WMSZ_TOP || wParam == WMSZ_TOPLEFT || wParam == WMSZ_TOPRIGHT ) {
+				r->top = r->bottom - ch - fh;
+			} else {
+				r->bottom = r->top + ch + fh;
+			}
+			return TRUE;
+		}
+		//==============================================
+		//	ウィンドウリサイズ確定（DirectXバッファ更新）
+		//==============================================
+		case WM_SIZE:
+			if ( wParam != SIZE_MINIMIZED && GetSwapChain() != nullptr ) {
+				int nw = LOWORD(lParam);
+				int nh = HIWORD(lParam);
+				if ( nw > 0 && nh > 0 ) {
+					g_mScreenWidth  = nw;
+					g_mScreenHeight = nh;
+					ResizeRenderTarget( nw, nh );
+					UpdateProjection();
+				}
+			}
+			break;
+		//==============================================
+		//	F11：全画面（ボーダーレス）切り替え
+		//==============================================
+		case WM_KEYDOWN:
+			if ( wParam == VK_F11 ) ToggleFullscreen( hWnd );
+			break;
 		//==============================================
 		//	終了時
 		//==============================================

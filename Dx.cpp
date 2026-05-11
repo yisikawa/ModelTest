@@ -191,6 +191,25 @@ bool InitRenderTarget( void )
 
 //======================================================================
 //
+//		レンダーターゲット・深度バッファのリサイズ（ウィンドウリサイズ時）
+//
+//======================================================================
+bool ResizeRenderTarget( int w, int h )
+{
+	// 既存の RTV/DSV を解放してからバッファをリサイズする
+	g_pD3DContext->OMSetRenderTargets( 0, nullptr, nullptr );
+	if ( g_pRenderTargetView ) { g_pRenderTargetView->Release(); g_pRenderTargetView = nullptr; }
+	if ( g_pDepthStencilView ) { g_pDepthStencilView->Release(); g_pDepthStencilView = nullptr; }
+
+	HRESULT hr = g_pSwapChain->ResizeBuffers( 0, (UINT)w, (UINT)h, DXGI_FORMAT_UNKNOWN, 0 );
+	if ( FAILED(hr) ) return false;
+
+	return InitRenderTarget();
+}
+
+
+//======================================================================
+//
 //		シェーダー・インプットレイアウト・定数バッファ初期化
 //
 //======================================================================

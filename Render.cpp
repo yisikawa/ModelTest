@@ -40,7 +40,7 @@ inline DWORD FtoDW( FLOAT f ) { return *((DWORD*)&f); }
 		float		g_mAnimStep			=	100.0f;
 extern	HWND		hDlg2;
 float				g_mFov			= PAI / 4.f;
-float				g_mAspect		= 1.4f;
+float				g_mAspect		= 16.f/9.f;
 float				g_mNear_z		= 0.1f;
 float				g_mFar_z		= 400.0f;
 LIGHTDATA			g_mLight, g_mLightbase;
@@ -178,6 +178,17 @@ bool Create3DSpace( void )
 	XMStoreFloat4x4( (XMFLOAT4X4*)&g_mProjLight,
 	                 XMMatrixOrthographicLH( 4.0f, 4.0f, 0.1f, 10.0f ) );
 	return true;
+}
+
+//======================================================================
+//
+//		プロジェクション行列更新（ウィンドウリサイズ時に呼び出す）
+//
+//======================================================================
+void UpdateProjection( void )
+{
+	g_mAspect = (float)g_mScreenWidth / (float)g_mScreenHeight;
+	D3DXMatrixPerspectiveFovLH( &g_mProjection, g_mFov, g_mAspect, g_mNear_z, g_mFar_z );
 }
 
 //======================================================================

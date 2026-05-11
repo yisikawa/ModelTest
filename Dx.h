@@ -43,6 +43,7 @@ struct CBPerObject
 bool InitD3D( void );
 void ReleaseD3D( void );
 bool InitRenderTarget( void );
+bool ResizeRenderTarget( int w, int h );
 bool InitShaders( void );
 
 ID3D11Device*           GetDevice( void );
