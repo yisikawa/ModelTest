@@ -311,7 +311,8 @@ int __stdcall WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
 	strcpy(ffxidir,"C:\\cross1");
 #else
 	ffxidir[0]=0;
-	if( ERROR_SUCCESS==RegOpenKeyEx(HKEY_LOCAL_MACHINE,"SOFTWARE\\PlayOnline\\InstallFolder",0,KEY_READ,&hKey) ){
+	if( ERROR_SUCCESS==RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+		"SOFTWARE\\PlayOnline\\InstallFolder",0,KEY_READ | KEY_WOW64_32KEY,&hKey) ){
 		DWORD dwData = sizeof(ffxidir);
 		DWORD dwType = REG_SZ;
 		RegQueryValueEx(hKey,"0001",NULL,&dwType,(LPBYTE)ffxidir,&dwData);
