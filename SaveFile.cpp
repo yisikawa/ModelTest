@@ -993,7 +993,7 @@ bool CModel::attachFBXSkinToPart(FbxScene* pScene, FbxMesh* pfbxMesh, int partsN
 	return true;
 }
 
-bool CModel::outputFBXAnimation(FbxScene* pScene)
+bool CModel::outputFBXAnimation(FbxScene* pScene, const std::unordered_map<std::string, FbxNode*>& nodeMap)
 {
 	D3DXQUATERNION q(0., 0., 0., 1.);
 	FbxQuaternion qq(0., 0., 0., 1.);
@@ -1015,15 +1015,6 @@ bool CModel::outputFBXAnimation(FbxScene* pScene)
     FbxTime fbxStart, fbxEnd;
     fbxStart.SetSecondDouble(0.0);
     fbxEnd.SetSecondDouble(0.0);
-
-	// ノード名→FbxNodeのマップを事前構築（O(N2)→O(N)に改善）
-	std::unordered_map<std::string, FbxNode*> nodeMap;
-	for (int j = 0; j < pScene->GetNodeCount(); j++) {
-		FbxNode* pN = pScene->GetNode(j);
-		if (pN) {
-			nodeMap[std::string(pN->GetName())] = pN;
-		}
-	}
 
 	FbxNode* pNode;
 	for (int i = 0; i < m_nBone; i++) {
@@ -1307,10 +1298,18 @@ bool CModel::saveFBX(char* FPath, char* FName)
 		}
 	}
 	fbxScene->AddPose(bindPose);
+
+	// ノード名→FbxNodeのマップを1回だけ構築し、全アニメーション出力で再利用
+	std::unordered_map<std::string, FbxNode*> nodeMap;
+	for (int j = 0; j < fbxScene->GetNodeCount(); j++) {
+		FbxNode* pN = fbxScene->GetNode(j);
+		if (pN) nodeMap[std::string(pN->GetName())] = pN;
+	}
+
 	std::vector<std::string> strlist;
 	strlist.clear();
 	//　アニメーション出力
-	//outputFBXAnimation(fbxScene);
+	//outputFBXAnimation(fbxScene, nodeMap);
 	char nameback[8]; strcpy(nameback, m_MotionName);
 	if (g_mPCFlag) {
 		CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
@@ -1325,7 +1324,7 @@ bool CModel::saveFBX(char* FPath, char* FName)
 				strlist.push_back(mName);
 				pPC->SetMotionName(mName);
 				pPC->LoadPCMotion();
-				outputFBXAnimation(fbxScene);
+				outputFBXAnimation(fbxScene, nodeMap);
 			}
 			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
 		}
@@ -1345,7 +1344,7 @@ bool CModel::saveFBX(char* FPath, char* FName)
 				strlist.push_back(mName);
 				pNPC->SetMotionName(mName);
 				pNPC->LoadNPCMotion();
-				outputFBXAnimation(fbxScene);
+				outputFBXAnimation(fbxScene, nodeMap);
 			}
 			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
 		}
