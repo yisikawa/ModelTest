@@ -7,6 +7,7 @@
 #include <fbxsdk.h>
 #include "DxMath.h"
 #include <vector>
+#include <unordered_map>
 
 
 //======================================================================
@@ -568,7 +569,7 @@ public:
 	virtual bool	outputBone2VerNo(FILE *fd, int boneNo);
 	virtual bool	outputBone2VerWeight(FILE *fd, int boneNo);
 	virtual bool	saveX(char *FPath, char *FName);
-	virtual bool	saveFBX(char* FPath, char* FName);
+	virtual bool	saveFBX(char* FPath, char* FName, bool withAnimation = true);
 	virtual bool	outputConvMatrix(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMatrix(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMatrixSub(FILE *fd, D3DXMATRIX *iMatrix);
@@ -580,7 +581,7 @@ public:
 	virtual bool	outputFBXFace(FbxMesh* pfbxMesh, FbxLayerElementMaterial* pMaterialElement);
 	virtual bool	outputFBXBone(FbxNode* pRootNode,FbxScene* pScene,FbxMesh *pMesh);
 	virtual bool	SetFBXBone2VerNo(FbxCluster* pCBCluster, int boneNo);
-	virtual bool    outputFBXAnimation(FbxScene* pShene);
+	virtual bool    outputFBXAnimation(FbxScene* pShene, const std::unordered_map<std::string, FbxNode*>& nodeMap);
 	virtual bool	outputNormal(FILE *fd);
 	virtual bool	outputNormalFace(FILE *fd);
 	virtual bool	outputTexCoord(FILE *fd);

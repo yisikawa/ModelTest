@@ -1532,9 +1532,10 @@ static short	x1=-1,y1=-1,x2,y2;
 				}
 			}
 			else if (LOWORD(wParam) == ID_MNU_SAVEFBX) {
+				bool withAnim = !(GetKeyState(VK_SHIFT) & 0x8000);
 				if (g_mPCFlag) {
 					if (GetSaveFileName(&sfbx)) {
-						if (!pPC->saveFBX(szFPathfbx, szFNamefbx)) {
+						if (!pPC->saveFBX(szFPathfbx, szFNamefbx, withAnim)) {
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathfbx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
@@ -1542,7 +1543,7 @@ static short	x1=-1,y1=-1,x2,y2;
 				}
 				else {
 					if (GetSaveFileName(&sfbx)) {
-						if (!pNPC->saveFBX(szFPathfbx, szFNamefbx)) {
+						if (!pNPC->saveFBX(szFPathfbx, szFNamefbx, withAnim)) {
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathfbx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
