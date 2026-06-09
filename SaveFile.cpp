@@ -1167,7 +1167,7 @@ bool CModel::outputFBXAnimation(FbxScene* pScene, const std::unordered_map<std::
 	return true;
 }
 
-bool CModel::saveFBX(char* FPath, char* FName)
+bool CModel::saveFBX(char* FPath, char* FName, bool withAnimation)
 {
 	D3DXVECTOR3 pIn, pOut;
 	char* ptr, fpath[256], texpath[256], texName[256];
@@ -1309,47 +1309,49 @@ bool CModel::saveFBX(char* FPath, char* FName)
 	std::vector<std::string> strlist;
 	strlist.clear();
 	//　アニメーション出力
-	//outputFBXAnimation(fbxScene, nodeMap);
-	char nameback[8]; strcpy(nameback, m_MotionName);
-	if (g_mPCFlag) {
-		CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
-		int cnt = 0;
-		while (pMotionFrame) {
-			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-			int k = 0;
-			for (; k < (int)strlist.size(); k++) {
-				if (strlist[k] == mName) break;
+	if (withAnimation) {
+		//outputFBXAnimation(fbxScene, nodeMap);
+		char nameback[8]; strcpy(nameback, m_MotionName);
+		if (g_mPCFlag) {
+			CMotionFrame* pMotionFrame = (CMotionFrame*)pPC->m_motions.Top();
+			int cnt = 0;
+			while (pMotionFrame) {
+				char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+				int k = 0;
+				for (; k < (int)strlist.size(); k++) {
+					if (strlist[k] == mName) break;
+				}
+				if (k >= (int)strlist.size()) {
+					strlist.push_back(mName);
+					pPC->SetMotionName(mName);
+					pPC->LoadPCMotion();
+					outputFBXAnimation(fbxScene, nodeMap);
+				}
+				pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
 			}
-			if (k >= (int)strlist.size()) {
-				strlist.push_back(mName);
-				pPC->SetMotionName(mName);
-				pPC->LoadPCMotion();
-				outputFBXAnimation(fbxScene, nodeMap);
-			}
-			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+			pPC->SetMotionName(nameback);
+			pPC->LoadPCMotion();
 		}
-		pPC->SetMotionName(nameback);
-		pPC->LoadPCMotion();
-	}
-	else {
-		CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
-		int cnt = 0;
-		while (pMotionFrame) {
-			char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
-			int k = 0;
-			for (; k < (int)strlist.size(); k++) {
-				if (strlist[k] == mName) break;
+		else {
+			CMotionFrame* pMotionFrame = (CMotionFrame*)pNPC->m_motions.Top();
+			int cnt = 0;
+			while (pMotionFrame) {
+				char mName[6]; strncpy(mName, (char*)pMotionFrame->m_Name, 3); mName[3] = '\0';
+				int k = 0;
+				for (; k < (int)strlist.size(); k++) {
+					if (strlist[k] == mName) break;
+				}
+				if (k >= (int)strlist.size()) {
+					strlist.push_back(mName);
+					pNPC->SetMotionName(mName);
+					pNPC->LoadNPCMotion();
+					outputFBXAnimation(fbxScene, nodeMap);
+				}
+				pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
 			}
-			if (k >= (int)strlist.size()) {
-				strlist.push_back(mName);
-				pNPC->SetMotionName(mName);
-				pNPC->LoadNPCMotion();
-				outputFBXAnimation(fbxScene, nodeMap);
-			}
-			pMotionFrame = (CMotionFrame*)pMotionFrame->Next;
+			pNPC->SetMotionName(nameback);
+			pNPC->LoadNPCMotion();
 		}
-		pNPC->SetMotionName(nameback);
-		pNPC->LoadNPCMotion();
 	}
 	// --- FBXファイルのエクスポート ---
 	int fileFormat=0,lFormatIndex=0, lFormatCount=0;
