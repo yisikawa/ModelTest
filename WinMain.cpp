@@ -16,6 +16,8 @@
 #include <fstream>
 
 #pragma comment(lib,"comdlg32.lib")
+#include <shlobj.h>
+#pragma comment(lib,"shell32.lib")
 
 
 //======================================================================
@@ -1565,6 +1567,27 @@ static short	x1=-1,y1=-1,x2,y2;
 							wsprintf(strmsg, "ファイル %s　は正しく処理できませんでした", szFPathx);
 							MessageBox(NULL, strmsg, "セーブファイルオープン", MB_OK | MB_ICONINFORMATION);
 						}
+					}
+				}
+			} else if( LOWORD(wParam) == ID_MNU_SAVE4VIEW ) {
+				char outDir[MAX_PATH] = {};
+				BROWSEINFOA bi = {};
+				bi.hwndOwner = hWnd;
+				bi.lpszTitle = "4面図の保存先フォルダを選択してください";
+				bi.ulFlags   = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+				LPITEMIDLIST pidl = SHBrowseForFolderA( &bi );
+				if ( pidl ) {
+					SHGetPathFromIDListA( pidl, outDir );
+					CoTaskMemFree( pidl );
+					if ( SaveOrthographicViews( outDir ) ) {
+						MessageBox( hWnd,
+							"4面図を保存しました。\r\n"
+							"  front.png / back.png\r\n"
+							"  left.png  / right.png",
+							"完了", MB_OK | MB_ICONINFORMATION );
+					} else {
+						MessageBox( hWnd, "4面図の保存に失敗しました。",
+							"エラー", MB_OK | MB_ICONERROR );
 					}
 				}
 			} else if( LOWORD(wParam) == ID_MNU_INVENT ) {

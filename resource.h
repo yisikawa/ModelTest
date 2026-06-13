@@ -51,6 +51,7 @@
 #define ID_40270                        40270
 #define ID_MNU_SAVEX					40271
 #define ID_MNU_SAVEFBX                  40281
+#define ID_MNU_SAVE4VIEW                40282
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

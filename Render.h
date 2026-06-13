@@ -44,6 +44,7 @@ void    UnInitRender( void );
 void    Rendering( void );
 bool    Create3DSpace( void );
 void    UpdateProjection( void );
+bool    SaveOrthographicViews( const char* outDir );
 class   CModel;
 CModel* GetActiveModel();
 
