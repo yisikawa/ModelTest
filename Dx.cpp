@@ -20,11 +20,15 @@ static ID3D11PixelShader*       g_pPixelShader        = nullptr;
 static ID3D11PixelShader*       g_pPixelShaderToon    = nullptr;
 static ID3D11ShaderResourceView*g_pToonRampSRV        = nullptr;
 static ID3D11SamplerState*      g_pClampSampler       = nullptr;
+static ID3D11VertexShader*      g_pVertexShaderOutline = nullptr;
+static ID3D11PixelShader*       g_pPixelShaderOutline  = nullptr;
 static ID3D11Buffer*            g_pCBPerFrame         = nullptr;
 static ID3D11Buffer*            g_pCBPerObject        = nullptr;
 static ID3D11SamplerState*      g_pLinearSampler      = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerNormal   = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerFlipped  = nullptr;
+static ID3D11RasterizerState*   g_pRasterizerFrontCull        = nullptr;
+static ID3D11RasterizerState*   g_pRasterizerFrontCullFlipped = nullptr;
 static ID3D11DepthStencilView*  g_pShadowDSV          = nullptr;
 static ID3D11ShaderResourceView*g_pShadowSRV          = nullptr;
 static ID3D11VertexShader*      g_pShadowVS           = nullptr;
@@ -45,11 +49,15 @@ ID3D11PixelShader*      GetPixelShader( void )      { return g_pPixelShader; }
 ID3D11PixelShader*      GetPixelShaderToon( void )  { return g_pPixelShaderToon; }
 ID3D11ShaderResourceView* GetToonRampSRV( void )    { return g_pToonRampSRV; }
 ID3D11SamplerState*       GetClampSampler( void )   { return g_pClampSampler; }
+ID3D11VertexShader*     GetVertexShaderOutline( void ) { return g_pVertexShaderOutline; }
+ID3D11PixelShader*      GetPixelShaderOutline( void )  { return g_pPixelShaderOutline; }
 ID3D11Buffer*           GetCBPerFrame( void )       { return g_pCBPerFrame; }
 ID3D11Buffer*           GetCBPerObject( void )      { return g_pCBPerObject; }
 ID3D11SamplerState*     GetLinearSampler( void )    { return g_pLinearSampler; }
 ID3D11RasterizerState*  GetRasterizerNormal( void ) { return g_pRasterizerNormal; }
 ID3D11RasterizerState*  GetRasterizerFlipped( void ){ return g_pRasterizerFlipped; }
+ID3D11RasterizerState*  GetRasterizerFrontCull( void )       { return g_pRasterizerFrontCull; }
+ID3D11RasterizerState*  GetRasterizerFrontCullFlipped( void ){ return g_pRasterizerFrontCullFlipped; }
 ID3D11DepthStencilView*   GetShadowDSV( void )     { return g_pShadowDSV; }
 ID3D11ShaderResourceView* GetShadowSRV( void )     { return g_pShadowSRV; }
 ID3D11VertexShader*       GetShadowVS( void )      { return g_pShadowVS; }
@@ -309,6 +317,44 @@ bool InitShaders( void )
 	if ( FAILED(hr) ) return false;
 
 	//==============================================================================
+	// 輪郭線用頂点シェーダーのコンパイル（OUTLINE マクロ有効、レイアウトは既存を共用）
+	//==============================================================================
+	static const D3D_SHADER_MACRO outlineDefines[] = { { "OUTLINE", "1" }, { nullptr, nullptr } };
+	ID3DBlob *pOutlineVSBlob = nullptr;
+	hr = D3DCompileFromFile( L"skinning_vs.hlsl", outlineDefines, nullptr,
+	                         "main", "vs_4_0", compileFlags, 0, &pOutlineVSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "OutlineVS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreateVertexShader(
+		pOutlineVSBlob->GetBufferPointer(), pOutlineVSBlob->GetBufferSize(),
+		nullptr, &g_pVertexShaderOutline );
+	pOutlineVSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// 輪郭線用ピクセルシェーダーのコンパイル
+	//==============================================================================
+	hr = D3DCompileFromFile( L"outline_ps.hlsl", nullptr, nullptr,
+	                         "main", "ps_4_0", compileFlags, 0, &pPSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "OutlinePS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreatePixelShader(
+		pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(),
+		nullptr, &g_pPixelShaderOutline );
+	pPSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
 	// トゥーン用ランプテクスチャ読み込み（256x1 BMP、横軸=N・L、暗部→明部）
 	//==============================================================================
 	{
@@ -417,6 +463,13 @@ bool InitShaders( void )
 
 	rd.FrontCounterClockwise = TRUE;
 	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFlipped );
+
+	rd.FrontCounterClockwise = FALSE;
+	rd.CullMode              = D3D11_CULL_FRONT;
+	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFrontCull );
+
+	rd.FrontCounterClockwise = TRUE;
+	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFrontCullFlipped );
 
 	//==============================================================================
 	// シャドウパス用頂点シェーダーのコンパイル
@@ -540,6 +593,8 @@ void ReleaseD3D( void )
 	if ( g_pShadowSRV )        { g_pShadowSRV->Release();        g_pShadowSRV         = nullptr; }
 	if ( g_pShadowDSV )        { g_pShadowDSV->Release();        g_pShadowDSV         = nullptr; }
 	if ( g_pShadowVS )         { g_pShadowVS->Release();         g_pShadowVS          = nullptr; }
+	if ( g_pRasterizerFrontCullFlipped ) { g_pRasterizerFrontCullFlipped->Release(); g_pRasterizerFrontCullFlipped = nullptr; }
+	if ( g_pRasterizerFrontCull )        { g_pRasterizerFrontCull->Release();        g_pRasterizerFrontCull        = nullptr; }
 	if ( g_pRasterizerFlipped ) { g_pRasterizerFlipped->Release(); g_pRasterizerFlipped = nullptr; }
 	if ( g_pRasterizerNormal )  { g_pRasterizerNormal->Release();  g_pRasterizerNormal  = nullptr; }
 	if ( g_pLinearSampler )     { g_pLinearSampler->Release();     g_pLinearSampler     = nullptr; }
@@ -547,6 +602,8 @@ void ReleaseD3D( void )
 	if ( g_pCBPerFrame )        { g_pCBPerFrame->Release();        g_pCBPerFrame        = nullptr; }
 	if ( g_pToonRampSRV )       { g_pToonRampSRV->Release();       g_pToonRampSRV       = nullptr; }
 	if ( g_pClampSampler )      { g_pClampSampler->Release();      g_pClampSampler      = nullptr; }
+	if ( g_pVertexShaderOutline ) { g_pVertexShaderOutline->Release(); g_pVertexShaderOutline = nullptr; }
+	if ( g_pPixelShaderOutline )  { g_pPixelShaderOutline->Release();  g_pPixelShaderOutline  = nullptr; }
 	if ( g_pPixelShaderToon )   { g_pPixelShaderToon->Release();   g_pPixelShaderToon   = nullptr; }
 	if ( g_pPixelShader )       { g_pPixelShader->Release();       g_pPixelShader       = nullptr; }
 	if ( g_pVertexShader )      { g_pVertexShader->Release();      g_pVertexShader      = nullptr; }

@@ -51,3 +51,5 @@ CModel* GetActiveModel();
 struct ID3D11RasterizerState;
 ID3D11RasterizerState* GetRasterizerNormal( void );
 ID3D11RasterizerState* GetRasterizerFlipped( void );
+ID3D11RasterizerState* GetRasterizerFrontCull( void );
+ID3D11RasterizerState* GetRasterizerFrontCullFlipped( void );

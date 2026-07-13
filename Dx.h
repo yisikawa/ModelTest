@@ -57,6 +57,8 @@ ID3D11PixelShader*      GetPixelShader( void );
 ID3D11PixelShader*      GetPixelShaderToon( void );
 ID3D11ShaderResourceView* GetToonRampSRV( void );
 ID3D11SamplerState*       GetClampSampler( void );
+ID3D11VertexShader*     GetVertexShaderOutline( void );
+ID3D11PixelShader*      GetPixelShaderOutline( void );
 ID3D11Buffer*           GetCBPerFrame( void );
 ID3D11Buffer*           GetCBPerObject( void );
 ID3D11SamplerState*     GetLinearSampler( void );
