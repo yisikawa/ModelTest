@@ -556,6 +556,7 @@ public:
 	virtual void	InitTransform( void );
 	virtual	float	MaxMotionTime( void );
 	virtual void	InitialTransform(void);
+	virtual void	BindPoseTransform(void);
 	virtual void	DynamicTransform(void);
 	virtual unsigned long Rendering(void);
 	virtual void	ShadowRendering(void);
@@ -569,7 +570,7 @@ public:
 	virtual bool	outputBone2VerNo(FILE *fd, int boneNo);
 	virtual bool	outputBone2VerWeight(FILE *fd, int boneNo);
 	virtual bool	saveX(char *FPath, char *FName);
-	virtual bool	saveFBX(char* FPath, char* FName);
+	virtual bool	saveFBX(char* FPath, char* FName, bool withAnimation = true);
 	virtual bool	outputConvMatrix(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMatrix(FILE *fd, D3DXMATRIX *iMatrix);
 	virtual bool	outputMatrixSub(FILE *fd, D3DXMATRIX *iMatrix);

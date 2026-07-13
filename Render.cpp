@@ -11,6 +11,9 @@
 #include "Dx.h"
 #include "Render.h"
 #include "Model.h"
+#include <DirectXTex.h>
+#include <wincodec.h>
+#pragma comment(lib, "DirectXTex.lib")
 
 //======================================================================
 // PROTOTYPE
@@ -270,5 +273,199 @@ void UnInitRender( void )
 void ReleaseModel( CModel **ppPC )
 {
 	SAFE_DELETE( *ppPC );
+}
+
+
+//======================================================================
+//
+//		4面図（正面・背面・左側面・右側面）をPNGとして保存
+//
+//		バインドポーズ（アニメなし）・正射影・シャドウなしで描画する
+//
+//======================================================================
+bool SaveOrthographicViews( const char* outDir )
+{
+	CModel* pModel = GetActiveModel();
+	if ( !pModel ) return false;
+
+	auto* pDev = GetDevice();
+	auto* pCtx = GetContext();
+
+	const int W = 1024, H = 1024;
+
+	//----------------------------------------------------------
+	// オフスクリーン カラー RT 作成（RGBA8、PNG保存用）
+	//----------------------------------------------------------
+	D3D11_TEXTURE2D_DESC tdesc = {};
+	tdesc.Width            = W;
+	tdesc.Height           = H;
+	tdesc.MipLevels        = 1;
+	tdesc.ArraySize        = 1;
+	tdesc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+	tdesc.SampleDesc.Count = 1;
+	tdesc.Usage            = D3D11_USAGE_DEFAULT;
+	tdesc.BindFlags        = D3D11_BIND_RENDER_TARGET;
+
+	ID3D11Texture2D*        pColorTex = nullptr;
+	ID3D11RenderTargetView* pRTV      = nullptr;
+	if ( FAILED( pDev->CreateTexture2D( &tdesc, nullptr, &pColorTex ) ) ) return false;
+	if ( FAILED( pDev->CreateRenderTargetView( pColorTex, nullptr, &pRTV ) ) ) {
+		pColorTex->Release(); return false;
+	}
+
+	//----------------------------------------------------------
+	// 深度バッファ作成
+	//----------------------------------------------------------
+	D3D11_TEXTURE2D_DESC ddesc = tdesc;
+	ddesc.Format    = DXGI_FORMAT_D32_FLOAT;
+	ddesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+	ID3D11Texture2D*        pDepthTex = nullptr;
+	ID3D11DepthStencilView* pDSV      = nullptr;
+	if ( FAILED( pDev->CreateTexture2D( &ddesc, nullptr, &pDepthTex ) ) ) {
+		pRTV->Release(); pColorTex->Release(); return false;
+	}
+	if ( FAILED( pDev->CreateDepthStencilView( pDepthTex, nullptr, &pDSV ) ) ) {
+		pDepthTex->Release(); pRTV->Release(); pColorTex->Release(); return false;
+	}
+
+	//----------------------------------------------------------
+	// 1×1 白テクスチャ SRV 作成（シャドウサンプラーに渡し影を無効化）
+	// 深度値 1.0f（最遠）→ pixel_depth <= 1.0f が常に成立 → shadow = 1.0（影なし）
+	//----------------------------------------------------------
+	float whiteDepth = 1.0f;
+	D3D11_TEXTURE2D_DESC wdesc = {};
+	wdesc.Width            = 1;
+	wdesc.Height           = 1;
+	wdesc.MipLevels        = 1;
+	wdesc.ArraySize        = 1;
+	wdesc.Format           = DXGI_FORMAT_R32_FLOAT;
+	wdesc.SampleDesc.Count = 1;
+	wdesc.Usage            = D3D11_USAGE_IMMUTABLE;
+	wdesc.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
+
+	D3D11_SUBRESOURCE_DATA wInit = { &whiteDepth, sizeof(float), 0 };
+	ID3D11Texture2D*          pWhiteTex = nullptr;
+	ID3D11ShaderResourceView* pWhiteSRV = nullptr;
+	pDev->CreateTexture2D( &wdesc, &wInit, &pWhiteTex );
+	pDev->CreateShaderResourceView( pWhiteTex, nullptr, &pWhiteSRV );
+	pWhiteTex->Release();
+
+	//----------------------------------------------------------
+	// 現在の状態を退避
+	//----------------------------------------------------------
+	D3DXMATRIX  savedView = g_mView;
+	D3DXMATRIX  savedProj = g_mProjection;
+	D3DXVECTOR3 savedEye  = g_mEye;
+
+	//----------------------------------------------------------
+	// バインドポーズを設定（MirrorY適用済み）
+	//----------------------------------------------------------
+	pModel->BindPoseTransform();
+
+	//----------------------------------------------------------
+	// 正射影行列設定（キャラ全高をカバー）
+	//----------------------------------------------------------
+	const float orthoSize = 2.8f;
+	XMStoreFloat4x4( (XMFLOAT4X4*)&g_mProjection,
+	                 XMMatrixOrthographicLH( orthoSize, orthoSize, 0.1f, 20.f ) );
+
+	//----------------------------------------------------------
+	// ビューポートをオフスクリーンサイズに設定
+	//----------------------------------------------------------
+	D3D11_VIEWPORT vp = {};
+	vp.Width    = (float)W;
+	vp.Height   = (float)H;
+	vp.MaxDepth = 1.0f;
+	pCtx->RSSetViewports( 1, &vp );
+
+	//----------------------------------------------------------
+	// シャドウスロットに白テクスチャをバインド（影を無効化）
+	//----------------------------------------------------------
+	ID3D11SamplerState* pShadowSmp = GetShadowSampler();
+	pCtx->PSSetShaderResources( 1, 1, &pWhiteSRV );
+	pCtx->PSSetSamplers( 1, 1, &pShadowSmp );
+
+	//----------------------------------------------------------
+	// 4方向レンダリング＆PNG保存
+	// BindPoseTransform で MirrorY が適用済みのため Y は正方向。
+	// 水平反転のみ行い、旧コード（180度回転）と同じ向きを維持する。
+	//----------------------------------------------------------
+	const D3DXVECTOR3 orthoAt( g_mAt.x, g_mAt.y, g_mAt.z );
+
+	struct ViewDef { D3DXVECTOR3 eye; const char* suffix; };
+	const ViewDef views[] = {
+		{ D3DXVECTOR3(  0.f, g_mAt.y,  5.f ), "front" },
+		{ D3DXVECTOR3(  0.f, g_mAt.y, -5.f ), "back"  },
+		{ D3DXVECTOR3(  5.f, g_mAt.y,  0.f ), "left"  },
+		{ D3DXVECTOR3( -5.f, g_mAt.y,  0.f ), "right" },
+	};
+
+	bool result = true;
+	for ( const auto& v : views ) {
+		g_mEye = v.eye;
+		D3DXMatrixLookAtLH( &g_mView, &g_mEye, &orthoAt, &g_mUp );
+
+		pCtx->OMSetRenderTargets( 1, &pRTV, pDSV );
+		const float clearColor[] = { 0.f, 0.f, 0.f, 0.f };
+		pCtx->ClearRenderTargetView( pRTV, clearColor );
+		pCtx->ClearDepthStencilView( pDSV, D3D11_CLEAR_DEPTH, 1.0f, 0 );
+
+		pModel->Rendering();
+
+		char path[MAX_PATH];
+		sprintf( path, "%s\\%s.png", outDir, v.suffix );
+		wchar_t wpath[MAX_PATH];
+		MultiByteToWideChar( CP_ACP, 0, path, -1, wpath, MAX_PATH );
+
+		DirectX::ScratchImage img;
+		if ( SUCCEEDED( DirectX::CaptureTexture( pDev, pCtx, pColorTex, img ) ) ) {
+			DirectX::ScratchImage flipped;
+			if ( SUCCEEDED( DirectX::FlipRotate( *img.GetImage( 0, 0, 0 ),
+			                                     DirectX::TEX_FR_FLIP_HORIZONTAL, flipped ) ) ) {
+				DirectX::SaveToWICFile( *flipped.GetImage( 0, 0, 0 ),
+				                        DirectX::WIC_FLAGS_NONE,
+				                        GUID_ContainerFormatPng, wpath );
+			} else {
+				result = false;
+			}
+		} else {
+			result = false;
+		}
+	}
+
+	//----------------------------------------------------------
+	// 状態を復元
+	//----------------------------------------------------------
+	g_mView       = savedView;
+	g_mProjection = savedProj;
+	g_mEye        = savedEye;
+
+	pModel->DynamicTransform();
+
+	ID3D11RenderTargetView* pMainRTV = GetRenderTargetView();
+	ID3D11DepthStencilView* pMainDSV = GetDepthStencilView();
+	pCtx->OMSetRenderTargets( 1, &pMainRTV, pMainDSV );
+
+	D3D11_VIEWPORT mainVP = {};
+	mainVP.Width    = (float)GetScreenWidth();
+	mainVP.Height   = (float)GetScreenHeight();
+	mainVP.MaxDepth = 1.0f;
+	pCtx->RSSetViewports( 1, &mainVP );
+
+	ID3D11ShaderResourceView* pShadowSRV = GetShadowSRV();
+	pCtx->PSSetShaderResources( 1, 1, &pShadowSRV );
+	pCtx->PSSetSamplers( 1, 1, &pShadowSmp );
+
+	//----------------------------------------------------------
+	// リソース解放
+	//----------------------------------------------------------
+	pWhiteSRV->Release();
+	pDSV->Release();
+	pDepthTex->Release();
+	pRTV->Release();
+	pColorTex->Release();
+
+	return result;
 }
 

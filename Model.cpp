@@ -604,6 +604,29 @@ void CModel::InitialTransform(void)
 
 
 //======================================================================
+//		バインドポーズで行列更新（MirrorY適用済み）
+//		InitialTransform と同じボーン行列を構築した後、
+//		m_mRootTransform（MirrorY）を適用する。
+//		bmat = inv(bindPose) * bindPose * MirrorY = MirrorY となり、
+//		m_FlipFlag によるラスタライザー選択が正しく機能する。
+//======================================================================
+void CModel::BindPoseTransform(void)
+{
+	int i;
+
+	for (i = 0; i < m_nBone; i++)
+		m_Bones[i].m_mWorld = m_Bones[i].m_mTransform;
+	for (i = 0; i < m_nBone; i++)
+		if (m_Bones[i].m_pParent)
+			m_Bones[i].m_mWorld *= ((CBone*)m_Bones[i].m_pParent)->m_mWorld;
+	for (i = 0; i < m_nBone; i++) {
+		D3DXMatrixInverse(&m_Bones[i].m_mInvTrans, 0, &m_Bones[i].m_mWorld);
+		m_Bones[i].m_mWorld *= m_mRootTransform;
+	}
+}
+
+
+//======================================================================
 //		モデルの行列更新
 //		全フレームの行列を算出します。
 //======================================================================
