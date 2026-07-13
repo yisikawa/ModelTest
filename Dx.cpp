@@ -17,6 +17,9 @@ static ID3D11DepthStencilView*  g_pDepthStencilView   = nullptr;
 static ID3D11InputLayout*       g_pInputLayout        = nullptr;
 static ID3D11VertexShader*      g_pVertexShader       = nullptr;
 static ID3D11PixelShader*       g_pPixelShader        = nullptr;
+static ID3D11PixelShader*       g_pPixelShaderToon    = nullptr;
+static ID3D11ShaderResourceView*g_pToonRampSRV        = nullptr;
+static ID3D11SamplerState*      g_pClampSampler       = nullptr;
 static ID3D11Buffer*            g_pCBPerFrame         = nullptr;
 static ID3D11Buffer*            g_pCBPerObject        = nullptr;
 static ID3D11SamplerState*      g_pLinearSampler      = nullptr;
@@ -39,6 +42,9 @@ ID3D11DepthStencilView* GetDepthStencilView( void ) { return g_pDepthStencilView
 ID3D11InputLayout*      GetInputLayout( void )      { return g_pInputLayout; }
 ID3D11VertexShader*     GetVertexShader( void )     { return g_pVertexShader; }
 ID3D11PixelShader*      GetPixelShader( void )      { return g_pPixelShader; }
+ID3D11PixelShader*      GetPixelShaderToon( void )  { return g_pPixelShaderToon; }
+ID3D11ShaderResourceView* GetToonRampSRV( void )    { return g_pToonRampSRV; }
+ID3D11SamplerState*       GetClampSampler( void )   { return g_pClampSampler; }
 ID3D11Buffer*           GetCBPerFrame( void )       { return g_pCBPerFrame; }
 ID3D11Buffer*           GetCBPerObject( void )      { return g_pCBPerObject; }
 ID3D11SamplerState*     GetLinearSampler( void )    { return g_pLinearSampler; }
@@ -284,6 +290,77 @@ bool InitShaders( void )
 	if ( FAILED(hr) ) return false;
 
 	//==============================================================================
+	// トゥーン版ピクセルシェーダーのコンパイル（TOON マクロ有効）
+	//==============================================================================
+	static const D3D_SHADER_MACRO toonDefines[] = { { "TOON", "1" }, { nullptr, nullptr } };
+	hr = D3DCompileFromFile( L"basic_ps.hlsl", toonDefines, nullptr,
+	                         "main", "ps_4_0", compileFlags, 0, &pPSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "ToonPS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreatePixelShader(
+		pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(),
+		nullptr, &g_pPixelShaderToon );
+	pPSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// トゥーン用ランプテクスチャ読み込み（256x1 BMP、横軸=N・L、暗部→明部）
+	//==============================================================================
+	{
+		HBITMAP hBmp = (HBITMAP)LoadImageA( nullptr, "toon_ramp.bmp", IMAGE_BITMAP,
+		                                    0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION );
+		if ( hBmp == nullptr ) {
+			MessageBoxA( nullptr, "toon_ramp.bmp が読み込めません", "ToonRamp Load Error", MB_OK );
+			return false;
+		}
+		DIBSECTION dib = {};
+		GetObject( hBmp, sizeof(dib), &dib );
+		int  w   = dib.dsBm.bmWidth;
+		int  h   = dib.dsBm.bmHeight;
+		int  bpp = dib.dsBm.bmBitsPixel;
+		if ( h != 1 || ( bpp != 24 && bpp != 32 ) || dib.dsBm.bmBits == nullptr ) {
+			DeleteObject( hBmp );
+			MessageBoxA( nullptr, "toon_ramp.bmp は 高さ1・24/32bit である必要があります", "ToonRamp Load Error", MB_OK );
+			return false;
+		}
+		// BGR(A) → RGBA 変換
+		unsigned char *pSrc = (unsigned char*)dib.dsBm.bmBits;
+		unsigned char *pRGBA = new unsigned char[ w * 4 ];
+		for ( int x = 0; x < w; x++ ) {
+			unsigned char *s = pSrc + x * ( bpp / 8 );
+			pRGBA[x*4+0] = s[2];
+			pRGBA[x*4+1] = s[1];
+			pRGBA[x*4+2] = s[0];
+			pRGBA[x*4+3] = 255;
+		}
+		D3D11_TEXTURE2D_DESC td = {};
+		td.Width            = w;
+		td.Height           = 1;
+		td.MipLevels        = 1;
+		td.ArraySize        = 1;
+		td.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+		td.SampleDesc.Count = 1;
+		td.Usage            = D3D11_USAGE_IMMUTABLE;
+		td.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
+		D3D11_SUBRESOURCE_DATA initData = {};
+		initData.pSysMem     = pRGBA;
+		initData.SysMemPitch = w * 4;
+		ID3D11Texture2D *pTex = nullptr;
+		hr = g_pD3DDevice->CreateTexture2D( &td, &initData, &pTex );
+		delete[] pRGBA;
+		DeleteObject( hBmp );
+		if ( FAILED(hr) ) return false;
+		hr = g_pD3DDevice->CreateShaderResourceView( pTex, nullptr, &g_pToonRampSRV );
+		pTex->Release();
+		if ( FAILED(hr) ) return false;
+	}
+
+	//==============================================================================
 	// 定数バッファ生成
 	//==============================================================================
 	D3D11_BUFFER_DESC cbd = {};
@@ -311,6 +388,20 @@ bool InitShaders( void )
 	sd2.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
 	sd2.MaxLOD         = D3D11_FLOAT32_MAX;
 	hr = g_pD3DDevice->CreateSamplerState( &sd2, &g_pLinearSampler );
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// クランプサンプラー生成（ランプテクスチャ用）
+	//==============================================================================
+	D3D11_SAMPLER_DESC sd3 = {};
+	sd3.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sd3.AddressU       = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sd3.AddressV       = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sd3.AddressW       = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sd3.MaxAnisotropy  = 1;
+	sd3.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	sd3.MaxLOD         = D3D11_FLOAT32_MAX;
+	hr = g_pD3DDevice->CreateSamplerState( &sd3, &g_pClampSampler );
 	if ( FAILED(hr) ) return false;
 
 	//==============================================================================
@@ -454,6 +545,9 @@ void ReleaseD3D( void )
 	if ( g_pLinearSampler )     { g_pLinearSampler->Release();     g_pLinearSampler     = nullptr; }
 	if ( g_pCBPerObject )       { g_pCBPerObject->Release();       g_pCBPerObject       = nullptr; }
 	if ( g_pCBPerFrame )        { g_pCBPerFrame->Release();        g_pCBPerFrame        = nullptr; }
+	if ( g_pToonRampSRV )       { g_pToonRampSRV->Release();       g_pToonRampSRV       = nullptr; }
+	if ( g_pClampSampler )      { g_pClampSampler->Release();      g_pClampSampler      = nullptr; }
+	if ( g_pPixelShaderToon )   { g_pPixelShaderToon->Release();   g_pPixelShaderToon   = nullptr; }
 	if ( g_pPixelShader )       { g_pPixelShader->Release();       g_pPixelShader       = nullptr; }
 	if ( g_pVertexShader )      { g_pVertexShader->Release();      g_pVertexShader      = nullptr; }
 	if ( g_pInputLayout )       { g_pInputLayout->Release();       g_pInputLayout       = nullptr; }

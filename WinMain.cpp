@@ -38,7 +38,7 @@ BOOL GetFileNameFromDir2(LPSTR filename,char *DataName );
 char	ffxidir[512];
 char	g_meshPath[512] = "";
 char	g_texPath[512] = "";
-bool	g_mDispWire = true,g_mDispIdl = true,g_mDispBone = false;
+bool	g_mDispToon = true,g_mDispIdl = true,g_mDispBone = false;
 //								hum m   hum f   el m    el f    tar m   tar f   M       G
 int		g_mShlBoneTbl[8][2]={ {64,78},{60,45},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0},{ 0, 0}};
 int		g_mDispBoneNo=1,g_mShlBoneNoR=g_mShlBoneTbl[0][0],g_mShlBoneNoL=g_mShlBoneTbl[0][1];
@@ -781,7 +781,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
             SendMessage(GetDlgItem(in_hWnd, IDC_CHECK1), BM_SETCHECK, (WPARAM)0, 0L);
 			g_mDispIdl = false;
             SendMessage(GetDlgItem(in_hWnd, IDC_CHECK2), BM_SETCHECK, (WPARAM)0, 0L);
-			g_mDispWire = false;
+			g_mDispToon = false;
 			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETBUDDY, (WPARAM)GetDlgItem(in_hWnd, IDC_EDIT1), 0);     // 対応するEditBox指定
 			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETRANGE, (WPARAM)1, (LPARAM)128);              // 範囲指定
 			//SendMessage(GetDlgItem(in_hWnd, IDC_SPIN1), UDM_SETPOS, 0, (LPARAM)1);       // 初期値の指定
@@ -1200,7 +1200,7 @@ LRESULT CALLBACK Dlg2Proc(HWND in_hWnd, UINT in_Message,WPARAM in_wParam, LPARAM
 					pNPC->LoadNPCMotion();
 					break;
 				case IDC_CHECK2:
-					g_mDispWire = g_mDispWire?false:true;
+					g_mDispToon = g_mDispToon?false:true;
 					break;
 				case IDC_EDIT1:
 					GetWindowText(GetDlgItem(in_hWnd, IDC_EDIT1), ComboString, sizeof(ComboString));

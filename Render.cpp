@@ -48,7 +48,7 @@ float				g_mNear_z		= 0.1f;
 float				g_mFar_z		= 400.0f;
 LIGHTDATA			g_mLight, g_mLightbase;
 static	float		fTime		= 0;
-extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
+extern	bool		g_mDispToon,g_mDispIdl,g_mDispBone;
 
 D3DXMATRIX			g_mProjection, g_mView, g_mEyeMat;
 float				g_mEyeScale=1.f, g_mEyeAlph = 0.f, g_mEyeBeta = 0.f;

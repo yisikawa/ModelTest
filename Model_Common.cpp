@@ -36,7 +36,7 @@ extern	float		g_mTime;
 extern	float		g_mLightDist;
 extern	D3DXVECTOR3	g_mLightPosition;
 extern	D3DXMATRIX	g_mViewLight;					// ライトから見た場合のビューマトリックス
-extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
+extern	bool		g_mDispToon,g_mDispIdl,g_mDispBone;
 extern	int			g_mDispBoneNo,g_mShlBoneNoR,g_mShlBoneNoL;
 extern	char		g_meshPath[];
 extern	char		g_texPath[];

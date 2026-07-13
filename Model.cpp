@@ -39,7 +39,7 @@ extern void convert_texture_path(char *path);
 extern	CPC			*pPC;
 extern	CNPC		*pNPC;
 extern	bool		g_mPCFlag;
-extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
+extern	bool		g_mDispToon,g_mDispIdl,g_mDispBone;
 extern	int			g_mDispBoneNo,g_mShlBoneNoR,g_mShlBoneNoL;
 extern	char		g_meshPath[];
 extern	char		g_texPath[];
@@ -704,10 +704,14 @@ unsigned long CModel::Rendering( void )
 
 	// ---- 固定シェーダー設定 ----
 	pCtx->VSSetShader( GetVertexShader(), nullptr, 0 );
-	pCtx->PSSetShader( GetPixelShader(),  nullptr, 0 );
+	pCtx->PSSetShader( g_mDispToon ? GetPixelShaderToon() : GetPixelShader(), nullptr, 0 );
 	pCtx->IASetInputLayout( GetInputLayout() );
 	ID3D11SamplerState *pSmp = GetLinearSampler();
 	pCtx->PSSetSamplers( 0, 1, &pSmp );
+	ID3D11ShaderResourceView *pRamp = GetToonRampSRV();
+	pCtx->PSSetShaderResources( 2, 1, &pRamp );
+	ID3D11SamplerState *pClampSmp = GetClampSampler();
+	pCtx->PSSetSamplers( 2, 1, &pClampSmp );
 
 	CMesh *pMesh = (CMesh*)m_Meshs.Top();
 	while ( pMesh != NULL )
