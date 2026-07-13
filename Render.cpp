@@ -167,7 +167,7 @@ bool Create3DSpace( void )
 	g_mLight.Diffuse.r  = 0.8f; g_mLight.Diffuse.g  = 0.8f; g_mLight.Diffuse.b  = 0.8f; g_mLight.Diffuse.a  = 1.0f;
 	g_mLight.Ambient.r  = 0.5f; g_mLight.Ambient.g  = 0.5f; g_mLight.Ambient.b  = 0.5f; g_mLight.Ambient.a  = 1.0f;
 	g_mLight.Specular.r = 0.5f; g_mLight.Specular.g = 0.5f; g_mLight.Specular.b = 0.5f; g_mLight.Specular.a = 1.0f;
-	D3DXVec3Normalize( &g_mLightbase.Direction, &D3DXVECTOR3( 0.3f, -1.0f, 0.3f ) );
+	D3DXVec3Normalize( &g_mLightbase.Direction, &D3DXVECTOR3( -0.3f, -1.0f, -0.3f ) );
 	g_mLight.Direction = g_mLightbase.Direction;
 
 	//===========================================================
