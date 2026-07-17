@@ -71,5 +71,7 @@ ID3D11SamplerState*       GetShadowSampler( void );
 void BeginShadowPass( void );
 void EndShadowPass( void );
 
+void RenderFloorShadow( void );
+
 HRESULT CreateVB( ID3D11Buffer** ppVB, UINT byteWidth, bool dynamic = false );
 HRESULT CreateIB( ID3D11Buffer** ppIB, UINT byteWidth, bool dynamic = false );

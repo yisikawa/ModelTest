@@ -126,6 +126,8 @@ void Rendering( void )
 		// Pass2: メインパス
 		poly += pNPC->Rendering();
 	}
+	// Pass3: シャドウキャッチャー床（半透明。CBPerFrameは直前のモデル描画で更新済み）
+	RenderFloorShadow();
 	AdDrawPolygons( poly );
 }
 

@@ -29,10 +29,16 @@ static ID3D11RasterizerState*   g_pRasterizerNormal   = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerFlipped  = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerFrontCull        = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerFrontCullFlipped = nullptr;
+static ID3D11RasterizerState*   g_pRasterizerFloor            = nullptr;
 static ID3D11DepthStencilView*  g_pShadowDSV          = nullptr;
 static ID3D11ShaderResourceView*g_pShadowSRV          = nullptr;
 static ID3D11VertexShader*      g_pShadowVS           = nullptr;
 static ID3D11SamplerState*      g_pShadowSampler      = nullptr;
+static ID3D11VertexShader*      g_pFloorVS            = nullptr;
+static ID3D11PixelShader*       g_pFloorPS            = nullptr;
+static ID3D11InputLayout*       g_pFloorInputLayout   = nullptr;
+static ID3D11Buffer*            g_pFloorVB            = nullptr;
+static ID3D11BlendState*        g_pBlendAlpha         = nullptr;
 
 
 //======================================================================
@@ -472,6 +478,15 @@ bool InitShaders( void )
 	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFrontCullFlipped );
 
 	//==============================================================================
+	// 床専用ラスタライザーステート（CULL_NONE）
+	// 床クアッドのTRIANGLESTRIP巻き順が逆でも無音で消えないよう、
+	// 両面描画にして表裏カリングの影響を受けないようにする。
+	//==============================================================================
+	rd.FrontCounterClockwise = FALSE;
+	rd.CullMode              = D3D11_CULL_NONE;
+	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFloor );
+
+	//==============================================================================
 	// シャドウパス用頂点シェーダーのコンパイル
 	//==============================================================================
 	ID3DBlob *pShadowVSBlob = nullptr;
@@ -535,6 +550,94 @@ bool InitShaders( void )
 	hr = g_pD3DDevice->CreateSamplerState( &sdShadow, &g_pShadowSampler );
 	if ( FAILED(hr) ) return false;
 
+	//==============================================================================
+	// シャドウキャッチャー床用 頂点シェーダーのコンパイル
+	//==============================================================================
+	ID3DBlob *pFloorVSBlob = nullptr;
+	hr = D3DCompileFromFile( L"floor_vs.hlsl", nullptr, nullptr,
+	                         "main", "vs_4_0", compileFlags, 0, &pFloorVSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "FloorVS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+
+	//==============================================================================
+	// 床用インプットレイアウト（POSITION float3 のみ）
+	//==============================================================================
+	D3D11_INPUT_ELEMENT_DESC floorLayout[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+	hr = g_pD3DDevice->CreateInputLayout(
+		floorLayout, ARRAYSIZE(floorLayout),
+		pFloorVSBlob->GetBufferPointer(), pFloorVSBlob->GetBufferSize(),
+		&g_pFloorInputLayout );
+	if ( FAILED(hr) ) { pFloorVSBlob->Release(); return false; }
+
+	hr = g_pD3DDevice->CreateVertexShader(
+		pFloorVSBlob->GetBufferPointer(), pFloorVSBlob->GetBufferSize(),
+		nullptr, &g_pFloorVS );
+	pFloorVSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// シャドウキャッチャー床用 ピクセルシェーダーのコンパイル
+	//==============================================================================
+	hr = D3DCompileFromFile( L"floor_ps.hlsl", nullptr, nullptr,
+	                         "main", "ps_4_0", compileFlags, 0, &pPSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "FloorPS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreatePixelShader(
+		pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(),
+		nullptr, &g_pFloorPS );
+	pPSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// 床用頂点バッファ生成（y≒0 のクアッド、TRIANGLESTRIP用、POSITIONのみ）
+	// y = -0.001f: キャラクターの足裏ジオメトリ(y=0)と完全に同一深度になると
+	// Zファイティングでちらつくため、わずかに沈めて回避する。
+	//==============================================================================
+	{
+		const float floorY = -0.001f;
+		float floorVerts[4][3] = {
+			{ -3.0f, floorY, -3.0f },
+			{ -3.0f, floorY,  3.0f },
+			{  3.0f, floorY, -3.0f },
+			{  3.0f, floorY,  3.0f },
+		};
+		D3D11_BUFFER_DESC vbd = {};
+		vbd.ByteWidth = sizeof(floorVerts);
+		vbd.Usage     = D3D11_USAGE_IMMUTABLE;
+		vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		D3D11_SUBRESOURCE_DATA vbInit = {};
+		vbInit.pSysMem = floorVerts;
+		hr = g_pD3DDevice->CreateBuffer( &vbd, &vbInit, &g_pFloorVB );
+		if ( FAILED(hr) ) return false;
+	}
+
+	//==============================================================================
+	// アルファブレンドステート生成（床の半透明シャドウ描画用）
+	//==============================================================================
+	D3D11_BLEND_DESC blendDesc = {};
+	blendDesc.RenderTarget[0].BlendEnable           = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+	blendDesc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	hr = g_pD3DDevice->CreateBlendState( &blendDesc, &g_pBlendAlpha );
+	if ( FAILED(hr) ) return false;
+
 	return true;
 }
 
@@ -584,11 +687,62 @@ void EndShadowPass( void )
 
 //======================================================================
 //
+//		シャドウキャッチャー床 描画
+//
+//		影の落ちる部分だけ半透明の黒を重ね描きする（y=0 固定ジオメトリ）。
+//		CBPerFrame は直前のモデル描画（Rendering/ShadowRendering）で
+//		当該フレームの view/proj/light 行列に更新済みのため、ここでの
+//		再アップロードは不要。深度テストによりモデルより手前には描かれないため
+//		モデル描画後に描いてよい。
+//
+//======================================================================
+void RenderFloorShadow( void )
+{
+	// ---- 入力レイアウト・頂点バッファ・プリミティブトポロジ ----
+	g_pD3DContext->IASetInputLayout( g_pFloorInputLayout );
+	UINT stride = sizeof(float) * 3;
+	UINT offset = 0;
+	g_pD3DContext->IASetVertexBuffers( 0, 1, &g_pFloorVB, &stride, &offset );
+	g_pD3DContext->IASetPrimitiveTopology( D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
+
+	// ---- 床用VS/PS設定 ----
+	g_pD3DContext->VSSetShader( g_pFloorVS, nullptr, 0 );
+	g_pD3DContext->PSSetShader( g_pFloorPS, nullptr, 0 );
+
+	// ---- CBPerFrame（VS/PS 両方にバインド） ----
+	g_pD3DContext->VSSetConstantBuffers( 0, 1, &g_pCBPerFrame );
+	g_pD3DContext->PSSetConstantBuffers( 0, 1, &g_pCBPerFrame );
+
+	// ---- シャドウマップ（t1/s1）を明示バインド ----
+	g_pD3DContext->PSSetShaderResources( 1, 1, &g_pShadowSRV );
+	g_pD3DContext->PSSetSamplers( 1, 1, &g_pShadowSampler );
+
+	// ---- ラスタライザ（巻き順未検証のため両面描画のCULL_NONEを使用） ----
+	g_pD3DContext->RSSetState( g_pRasterizerFloor );
+
+	// ---- アルファブレンド有効化して描画、終了後は不透明描画に復帰 ----
+	g_pD3DContext->OMSetBlendState( g_pBlendAlpha, nullptr, 0xffffffff );
+	g_pD3DContext->Draw( 4, 0 );
+	g_pD3DContext->OMSetBlendState( nullptr, nullptr, 0xffffffff );
+
+	// ---- ラスタライザを通常状態に復帰（次のモデル描画に影響を残さない） ----
+	g_pD3DContext->RSSetState( g_pRasterizerNormal );
+}
+
+
+//======================================================================
+//
 //		DirectX 11 解放
 //
 //======================================================================
 void ReleaseD3D( void )
 {
+	if ( g_pBlendAlpha )        { g_pBlendAlpha->Release();        g_pBlendAlpha        = nullptr; }
+	if ( g_pFloorVB )           { g_pFloorVB->Release();           g_pFloorVB           = nullptr; }
+	if ( g_pFloorPS )           { g_pFloorPS->Release();           g_pFloorPS           = nullptr; }
+	if ( g_pFloorVS )           { g_pFloorVS->Release();           g_pFloorVS           = nullptr; }
+	if ( g_pFloorInputLayout )  { g_pFloorInputLayout->Release();  g_pFloorInputLayout  = nullptr; }
+	if ( g_pRasterizerFloor )   { g_pRasterizerFloor->Release();   g_pRasterizerFloor   = nullptr; }
 	if ( g_pShadowSampler )     { g_pShadowSampler->Release();     g_pShadowSampler     = nullptr; }
 	if ( g_pShadowSRV )        { g_pShadowSRV->Release();        g_pShadowSRV         = nullptr; }
 	if ( g_pShadowDSV )        { g_pShadowDSV->Release();        g_pShadowDSV         = nullptr; }
