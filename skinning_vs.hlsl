@@ -21,6 +21,8 @@ cbuffer CBPerObject : register(b1)
     row_major float4x4 boneMatrices[128];
 };
 
+static const float outlineWidth = 0.012f;   // 輪郭線の太さ(ワールド単位)
+
 struct VS_INPUT
 {
     // Slot 0 (VB1)
@@ -61,14 +63,20 @@ VS_OUTPUT main(VS_INPUT input)
                      + mul(localPos2, boneMatrices[bone2]) * w2;
 
     float4 worldPos  = mul(bonePos,  matWorld);
-    float4 viewPos   = mul(worldPos, matView);
-    output.position  = mul(viewPos,  matProj);
-    output.worldPos  = worldPos.xyz;
 
     // 法線ブレンド
     float3 boneNormal  = mul(input.normal,  (float3x3)boneMatrices[bone1]) * w1
                        + mul(input.normal2, (float3x3)boneMatrices[bone2]) * w2;
     output.worldNormal   = normalize(mul(boneNormal, (float3x3)matWorld));
+
+#ifdef OUTLINE
+    // 背面法: 法線方向に押し出し(前面カリングで背面のみ描画して輪郭線にする)
+    worldPos.xyz += output.worldNormal * outlineWidth;
+#endif
+
+    float4 viewPos   = mul(worldPos, matView);
+    output.position  = mul(viewPos,  matProj);
+    output.worldPos  = worldPos.xyz;
     output.posLightSpace = mul(mul(worldPos, matLightView), matLightProj);
 
     output.texcoord = input.texcoord;

@@ -54,6 +54,11 @@ ID3D11DepthStencilView* GetDepthStencilView( void );
 ID3D11InputLayout*      GetInputLayout( void );
 ID3D11VertexShader*     GetVertexShader( void );
 ID3D11PixelShader*      GetPixelShader( void );
+ID3D11PixelShader*      GetPixelShaderToon( void );
+ID3D11ShaderResourceView* GetToonRampSRV( void );
+ID3D11SamplerState*       GetClampSampler( void );
+ID3D11VertexShader*     GetVertexShaderOutline( void );
+ID3D11PixelShader*      GetPixelShaderOutline( void );
 ID3D11Buffer*           GetCBPerFrame( void );
 ID3D11Buffer*           GetCBPerObject( void );
 ID3D11SamplerState*     GetLinearSampler( void );
@@ -65,6 +70,8 @@ ID3D11SamplerState*       GetShadowSampler( void );
 
 void BeginShadowPass( void );
 void EndShadowPass( void );
+
+void RenderFloorShadow( void );
 
 HRESULT CreateVB( ID3D11Buffer** ppVB, UINT byteWidth, bool dynamic = false );
 HRESULT CreateIB( ID3D11Buffer** ppIB, UINT byteWidth, bool dynamic = false );

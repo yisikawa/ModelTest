@@ -6,6 +6,9 @@ SamplerState g_samLinear  : register(s0);
 Texture2D<float>       g_texShadow : register(t1);
 SamplerComparisonState g_samShadow : register(s1);
 
+Texture2D    g_texToonRamp : register(t2);
+SamplerState g_samClamp    : register(s2);
+
 cbuffer CBPerFrame : register(b0)
 {
     row_major float4x4 matView;
@@ -27,6 +30,8 @@ static const float specularStrength = 0.35f;
 static const float rimPower         = 2.5f;
 static const float rimStrength      = 0.18f;
 static const bool  enableGamma      = false;
+static const float toonRimModulation = 0.35f;  // 陰側のリム抑制(N・Lの累乗)
+static const float toonRimAmount     = 0.30f;  // リム発生の閾値(0..1)
 
 struct PS_INPUT
 {
@@ -115,10 +120,27 @@ float4 main(PS_INPUT input) : SV_TARGET
     float shadow   = ComputeShadow(input.posLightSpace, N, L);
     float rim      = ComputeRim(N, V);
 
+#ifdef TOON
+    // セルシェーディング: N・Lをランプテクスチャで階調化(影中は暗部側へ)
+    float ndotl        = saturate(dot(N, L));
+    float shadowFactor = smoothstep(0.3f, 0.7f, shadow);
+    float rampU        = ndotl * shadowFactor;
+    float3 band        = g_texToonRamp.Sample(g_samClamp, float2(rampU, 0.5f)).rgb;
+
+    float spec = smoothstep(0.4f * specularStrength, 0.5f * specularStrength, specular * shadowFactor) * specularStrength;
+
+    float rimT    = (rim / rimStrength) * pow(ndotl, toonRimModulation);
+    float rimToon = smoothstep(toonRimAmount - 0.02f, toonRimAmount + 0.02f, rimT) * rimStrength;
+
+    float3 lighting = band * (lightAmbient.rgb + lightDiffuse.rgb)
+                    + spec * lightSpecular.rgb
+                    + rimToon * lightDiffuse.rgb;
+#else
     float3 lighting = lightAmbient.rgb
                     + shadow * diffuse  * lightDiffuse.rgb
                     + shadow * specular * lightSpecular.rgb
                     + rim * lightDiffuse.rgb;
+#endif
 
     float3 finalColor = tex.rgb * lighting;
     finalColor = ApplyOutputGamma(finalColor);

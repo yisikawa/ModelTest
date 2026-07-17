@@ -17,15 +17,28 @@ static ID3D11DepthStencilView*  g_pDepthStencilView   = nullptr;
 static ID3D11InputLayout*       g_pInputLayout        = nullptr;
 static ID3D11VertexShader*      g_pVertexShader       = nullptr;
 static ID3D11PixelShader*       g_pPixelShader        = nullptr;
+static ID3D11PixelShader*       g_pPixelShaderToon    = nullptr;
+static ID3D11ShaderResourceView*g_pToonRampSRV        = nullptr;
+static ID3D11SamplerState*      g_pClampSampler       = nullptr;
+static ID3D11VertexShader*      g_pVertexShaderOutline = nullptr;
+static ID3D11PixelShader*       g_pPixelShaderOutline  = nullptr;
 static ID3D11Buffer*            g_pCBPerFrame         = nullptr;
 static ID3D11Buffer*            g_pCBPerObject        = nullptr;
 static ID3D11SamplerState*      g_pLinearSampler      = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerNormal   = nullptr;
 static ID3D11RasterizerState*   g_pRasterizerFlipped  = nullptr;
+static ID3D11RasterizerState*   g_pRasterizerFrontCull        = nullptr;
+static ID3D11RasterizerState*   g_pRasterizerFrontCullFlipped = nullptr;
+static ID3D11RasterizerState*   g_pRasterizerFloor            = nullptr;
 static ID3D11DepthStencilView*  g_pShadowDSV          = nullptr;
 static ID3D11ShaderResourceView*g_pShadowSRV          = nullptr;
 static ID3D11VertexShader*      g_pShadowVS           = nullptr;
 static ID3D11SamplerState*      g_pShadowSampler      = nullptr;
+static ID3D11VertexShader*      g_pFloorVS            = nullptr;
+static ID3D11PixelShader*       g_pFloorPS            = nullptr;
+static ID3D11InputLayout*       g_pFloorInputLayout   = nullptr;
+static ID3D11Buffer*            g_pFloorVB            = nullptr;
+static ID3D11BlendState*        g_pBlendAlpha         = nullptr;
 
 
 //======================================================================
@@ -39,11 +52,18 @@ ID3D11DepthStencilView* GetDepthStencilView( void ) { return g_pDepthStencilView
 ID3D11InputLayout*      GetInputLayout( void )      { return g_pInputLayout; }
 ID3D11VertexShader*     GetVertexShader( void )     { return g_pVertexShader; }
 ID3D11PixelShader*      GetPixelShader( void )      { return g_pPixelShader; }
+ID3D11PixelShader*      GetPixelShaderToon( void )  { return g_pPixelShaderToon; }
+ID3D11ShaderResourceView* GetToonRampSRV( void )    { return g_pToonRampSRV; }
+ID3D11SamplerState*       GetClampSampler( void )   { return g_pClampSampler; }
+ID3D11VertexShader*     GetVertexShaderOutline( void ) { return g_pVertexShaderOutline; }
+ID3D11PixelShader*      GetPixelShaderOutline( void )  { return g_pPixelShaderOutline; }
 ID3D11Buffer*           GetCBPerFrame( void )       { return g_pCBPerFrame; }
 ID3D11Buffer*           GetCBPerObject( void )      { return g_pCBPerObject; }
 ID3D11SamplerState*     GetLinearSampler( void )    { return g_pLinearSampler; }
 ID3D11RasterizerState*  GetRasterizerNormal( void ) { return g_pRasterizerNormal; }
 ID3D11RasterizerState*  GetRasterizerFlipped( void ){ return g_pRasterizerFlipped; }
+ID3D11RasterizerState*  GetRasterizerFrontCull( void )       { return g_pRasterizerFrontCull; }
+ID3D11RasterizerState*  GetRasterizerFrontCullFlipped( void ){ return g_pRasterizerFrontCullFlipped; }
 ID3D11DepthStencilView*   GetShadowDSV( void )     { return g_pShadowDSV; }
 ID3D11ShaderResourceView* GetShadowSRV( void )     { return g_pShadowSRV; }
 ID3D11VertexShader*       GetShadowVS( void )      { return g_pShadowVS; }
@@ -284,6 +304,115 @@ bool InitShaders( void )
 	if ( FAILED(hr) ) return false;
 
 	//==============================================================================
+	// トゥーン版ピクセルシェーダーのコンパイル（TOON マクロ有効）
+	//==============================================================================
+	static const D3D_SHADER_MACRO toonDefines[] = { { "TOON", "1" }, { nullptr, nullptr } };
+	hr = D3DCompileFromFile( L"basic_ps.hlsl", toonDefines, nullptr,
+	                         "main", "ps_4_0", compileFlags, 0, &pPSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "ToonPS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreatePixelShader(
+		pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(),
+		nullptr, &g_pPixelShaderToon );
+	pPSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// 輪郭線用頂点シェーダーのコンパイル（OUTLINE マクロ有効、レイアウトは既存を共用）
+	//==============================================================================
+	static const D3D_SHADER_MACRO outlineDefines[] = { { "OUTLINE", "1" }, { nullptr, nullptr } };
+	ID3DBlob *pOutlineVSBlob = nullptr;
+	hr = D3DCompileFromFile( L"skinning_vs.hlsl", outlineDefines, nullptr,
+	                         "main", "vs_4_0", compileFlags, 0, &pOutlineVSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "OutlineVS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreateVertexShader(
+		pOutlineVSBlob->GetBufferPointer(), pOutlineVSBlob->GetBufferSize(),
+		nullptr, &g_pVertexShaderOutline );
+	pOutlineVSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// 輪郭線用ピクセルシェーダーのコンパイル
+	//==============================================================================
+	hr = D3DCompileFromFile( L"outline_ps.hlsl", nullptr, nullptr,
+	                         "main", "ps_4_0", compileFlags, 0, &pPSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "OutlinePS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreatePixelShader(
+		pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(),
+		nullptr, &g_pPixelShaderOutline );
+	pPSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// トゥーン用ランプテクスチャ読み込み（256x1 BMP、横軸=N・L、暗部→明部）
+	//==============================================================================
+	{
+		HBITMAP hBmp = (HBITMAP)LoadImageA( nullptr, "toon_ramp.bmp", IMAGE_BITMAP,
+		                                    0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION );
+		if ( hBmp == nullptr ) {
+			MessageBoxA( nullptr, "toon_ramp.bmp が読み込めません", "ToonRamp Load Error", MB_OK );
+			return false;
+		}
+		DIBSECTION dib = {};
+		GetObject( hBmp, sizeof(dib), &dib );
+		int  w   = dib.dsBm.bmWidth;
+		int  h   = dib.dsBm.bmHeight;
+		int  bpp = dib.dsBm.bmBitsPixel;
+		if ( h != 1 || ( bpp != 24 && bpp != 32 ) || dib.dsBm.bmBits == nullptr ) {
+			DeleteObject( hBmp );
+			MessageBoxA( nullptr, "toon_ramp.bmp は 高さ1・24/32bit である必要があります", "ToonRamp Load Error", MB_OK );
+			return false;
+		}
+		// BGR(A) → RGBA 変換
+		unsigned char *pSrc = (unsigned char*)dib.dsBm.bmBits;
+		unsigned char *pRGBA = new unsigned char[ w * 4 ];
+		for ( int x = 0; x < w; x++ ) {
+			unsigned char *s = pSrc + x * ( bpp / 8 );
+			pRGBA[x*4+0] = s[2];
+			pRGBA[x*4+1] = s[1];
+			pRGBA[x*4+2] = s[0];
+			pRGBA[x*4+3] = 255;
+		}
+		D3D11_TEXTURE2D_DESC td = {};
+		td.Width            = w;
+		td.Height           = 1;
+		td.MipLevels        = 1;
+		td.ArraySize        = 1;
+		td.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+		td.SampleDesc.Count = 1;
+		td.Usage            = D3D11_USAGE_IMMUTABLE;
+		td.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
+		D3D11_SUBRESOURCE_DATA initData = {};
+		initData.pSysMem     = pRGBA;
+		initData.SysMemPitch = w * 4;
+		ID3D11Texture2D *pTex = nullptr;
+		hr = g_pD3DDevice->CreateTexture2D( &td, &initData, &pTex );
+		delete[] pRGBA;
+		DeleteObject( hBmp );
+		if ( FAILED(hr) ) return false;
+		hr = g_pD3DDevice->CreateShaderResourceView( pTex, nullptr, &g_pToonRampSRV );
+		pTex->Release();
+		if ( FAILED(hr) ) return false;
+	}
+
+	//==============================================================================
 	// 定数バッファ生成
 	//==============================================================================
 	D3D11_BUFFER_DESC cbd = {};
@@ -314,6 +443,20 @@ bool InitShaders( void )
 	if ( FAILED(hr) ) return false;
 
 	//==============================================================================
+	// クランプサンプラー生成（ランプテクスチャ用）
+	//==============================================================================
+	D3D11_SAMPLER_DESC sd3 = {};
+	sd3.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sd3.AddressU       = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sd3.AddressV       = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sd3.AddressW       = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sd3.MaxAnisotropy  = 1;
+	sd3.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	sd3.MaxLOD         = D3D11_FLOAT32_MAX;
+	hr = g_pD3DDevice->CreateSamplerState( &sd3, &g_pClampSampler );
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
 	// ラスタライザーステート生成（通常 / ミラーメッシュ用）
 	//==============================================================================
 	D3D11_RASTERIZER_DESC rd = {};
@@ -326,6 +469,22 @@ bool InitShaders( void )
 
 	rd.FrontCounterClockwise = TRUE;
 	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFlipped );
+
+	rd.FrontCounterClockwise = FALSE;
+	rd.CullMode              = D3D11_CULL_FRONT;
+	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFrontCull );
+
+	rd.FrontCounterClockwise = TRUE;
+	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFrontCullFlipped );
+
+	//==============================================================================
+	// 床専用ラスタライザーステート（CULL_NONE）
+	// 床クアッドのTRIANGLESTRIP巻き順が逆でも無音で消えないよう、
+	// 両面描画にして表裏カリングの影響を受けないようにする。
+	//==============================================================================
+	rd.FrontCounterClockwise = FALSE;
+	rd.CullMode              = D3D11_CULL_NONE;
+	g_pD3DDevice->CreateRasterizerState( &rd, &g_pRasterizerFloor );
 
 	//==============================================================================
 	// シャドウパス用頂点シェーダーのコンパイル
@@ -391,6 +550,94 @@ bool InitShaders( void )
 	hr = g_pD3DDevice->CreateSamplerState( &sdShadow, &g_pShadowSampler );
 	if ( FAILED(hr) ) return false;
 
+	//==============================================================================
+	// シャドウキャッチャー床用 頂点シェーダーのコンパイル
+	//==============================================================================
+	ID3DBlob *pFloorVSBlob = nullptr;
+	hr = D3DCompileFromFile( L"floor_vs.hlsl", nullptr, nullptr,
+	                         "main", "vs_4_0", compileFlags, 0, &pFloorVSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "FloorVS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+
+	//==============================================================================
+	// 床用インプットレイアウト（POSITION float3 のみ）
+	//==============================================================================
+	D3D11_INPUT_ELEMENT_DESC floorLayout[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+	hr = g_pD3DDevice->CreateInputLayout(
+		floorLayout, ARRAYSIZE(floorLayout),
+		pFloorVSBlob->GetBufferPointer(), pFloorVSBlob->GetBufferSize(),
+		&g_pFloorInputLayout );
+	if ( FAILED(hr) ) { pFloorVSBlob->Release(); return false; }
+
+	hr = g_pD3DDevice->CreateVertexShader(
+		pFloorVSBlob->GetBufferPointer(), pFloorVSBlob->GetBufferSize(),
+		nullptr, &g_pFloorVS );
+	pFloorVSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// シャドウキャッチャー床用 ピクセルシェーダーのコンパイル
+	//==============================================================================
+	hr = D3DCompileFromFile( L"floor_ps.hlsl", nullptr, nullptr,
+	                         "main", "ps_4_0", compileFlags, 0, &pPSBlob, &pErrBlob );
+	if ( FAILED(hr) ) {
+		if ( pErrBlob ) {
+			MessageBoxA( nullptr, (char*)pErrBlob->GetBufferPointer(), "FloorPS Compile Error", MB_OK );
+			pErrBlob->Release();
+		}
+		return false;
+	}
+	hr = g_pD3DDevice->CreatePixelShader(
+		pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(),
+		nullptr, &g_pFloorPS );
+	pPSBlob->Release();
+	if ( FAILED(hr) ) return false;
+
+	//==============================================================================
+	// 床用頂点バッファ生成（y≒0 のクアッド、TRIANGLESTRIP用、POSITIONのみ）
+	// y = -0.001f: キャラクターの足裏ジオメトリ(y=0)と完全に同一深度になると
+	// Zファイティングでちらつくため、わずかに沈めて回避する。
+	//==============================================================================
+	{
+		const float floorY = -0.001f;
+		float floorVerts[4][3] = {
+			{ -3.0f, floorY, -3.0f },
+			{ -3.0f, floorY,  3.0f },
+			{  3.0f, floorY, -3.0f },
+			{  3.0f, floorY,  3.0f },
+		};
+		D3D11_BUFFER_DESC vbd = {};
+		vbd.ByteWidth = sizeof(floorVerts);
+		vbd.Usage     = D3D11_USAGE_IMMUTABLE;
+		vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		D3D11_SUBRESOURCE_DATA vbInit = {};
+		vbInit.pSysMem = floorVerts;
+		hr = g_pD3DDevice->CreateBuffer( &vbd, &vbInit, &g_pFloorVB );
+		if ( FAILED(hr) ) return false;
+	}
+
+	//==============================================================================
+	// アルファブレンドステート生成（床の半透明シャドウ描画用）
+	//==============================================================================
+	D3D11_BLEND_DESC blendDesc = {};
+	blendDesc.RenderTarget[0].BlendEnable           = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+	blendDesc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	hr = g_pD3DDevice->CreateBlendState( &blendDesc, &g_pBlendAlpha );
+	if ( FAILED(hr) ) return false;
+
 	return true;
 }
 
@@ -440,20 +687,78 @@ void EndShadowPass( void )
 
 //======================================================================
 //
+//		シャドウキャッチャー床 描画
+//
+//		影の落ちる部分だけ半透明の黒を重ね描きする（y=0 固定ジオメトリ）。
+//		CBPerFrame は直前のモデル描画（Rendering/ShadowRendering）で
+//		当該フレームの view/proj/light 行列に更新済みのため、ここでの
+//		再アップロードは不要。深度テストによりモデルより手前には描かれないため
+//		モデル描画後に描いてよい。
+//
+//======================================================================
+void RenderFloorShadow( void )
+{
+	// ---- 入力レイアウト・頂点バッファ・プリミティブトポロジ ----
+	g_pD3DContext->IASetInputLayout( g_pFloorInputLayout );
+	UINT stride = sizeof(float) * 3;
+	UINT offset = 0;
+	g_pD3DContext->IASetVertexBuffers( 0, 1, &g_pFloorVB, &stride, &offset );
+	g_pD3DContext->IASetPrimitiveTopology( D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
+
+	// ---- 床用VS/PS設定 ----
+	g_pD3DContext->VSSetShader( g_pFloorVS, nullptr, 0 );
+	g_pD3DContext->PSSetShader( g_pFloorPS, nullptr, 0 );
+
+	// ---- CBPerFrame（VS/PS 両方にバインド） ----
+	g_pD3DContext->VSSetConstantBuffers( 0, 1, &g_pCBPerFrame );
+	g_pD3DContext->PSSetConstantBuffers( 0, 1, &g_pCBPerFrame );
+
+	// ---- シャドウマップ（t1/s1）を明示バインド ----
+	g_pD3DContext->PSSetShaderResources( 1, 1, &g_pShadowSRV );
+	g_pD3DContext->PSSetSamplers( 1, 1, &g_pShadowSampler );
+
+	// ---- ラスタライザ（巻き順未検証のため両面描画のCULL_NONEを使用） ----
+	g_pD3DContext->RSSetState( g_pRasterizerFloor );
+
+	// ---- アルファブレンド有効化して描画、終了後は不透明描画に復帰 ----
+	g_pD3DContext->OMSetBlendState( g_pBlendAlpha, nullptr, 0xffffffff );
+	g_pD3DContext->Draw( 4, 0 );
+	g_pD3DContext->OMSetBlendState( nullptr, nullptr, 0xffffffff );
+
+	// ---- ラスタライザを通常状態に復帰（次のモデル描画に影響を残さない） ----
+	g_pD3DContext->RSSetState( g_pRasterizerNormal );
+}
+
+
+//======================================================================
+//
 //		DirectX 11 解放
 //
 //======================================================================
 void ReleaseD3D( void )
 {
+	if ( g_pBlendAlpha )        { g_pBlendAlpha->Release();        g_pBlendAlpha        = nullptr; }
+	if ( g_pFloorVB )           { g_pFloorVB->Release();           g_pFloorVB           = nullptr; }
+	if ( g_pFloorPS )           { g_pFloorPS->Release();           g_pFloorPS           = nullptr; }
+	if ( g_pFloorVS )           { g_pFloorVS->Release();           g_pFloorVS           = nullptr; }
+	if ( g_pFloorInputLayout )  { g_pFloorInputLayout->Release();  g_pFloorInputLayout  = nullptr; }
+	if ( g_pRasterizerFloor )   { g_pRasterizerFloor->Release();   g_pRasterizerFloor   = nullptr; }
 	if ( g_pShadowSampler )     { g_pShadowSampler->Release();     g_pShadowSampler     = nullptr; }
 	if ( g_pShadowSRV )        { g_pShadowSRV->Release();        g_pShadowSRV         = nullptr; }
 	if ( g_pShadowDSV )        { g_pShadowDSV->Release();        g_pShadowDSV         = nullptr; }
 	if ( g_pShadowVS )         { g_pShadowVS->Release();         g_pShadowVS          = nullptr; }
+	if ( g_pRasterizerFrontCullFlipped ) { g_pRasterizerFrontCullFlipped->Release(); g_pRasterizerFrontCullFlipped = nullptr; }
+	if ( g_pRasterizerFrontCull )        { g_pRasterizerFrontCull->Release();        g_pRasterizerFrontCull        = nullptr; }
 	if ( g_pRasterizerFlipped ) { g_pRasterizerFlipped->Release(); g_pRasterizerFlipped = nullptr; }
 	if ( g_pRasterizerNormal )  { g_pRasterizerNormal->Release();  g_pRasterizerNormal  = nullptr; }
 	if ( g_pLinearSampler )     { g_pLinearSampler->Release();     g_pLinearSampler     = nullptr; }
 	if ( g_pCBPerObject )       { g_pCBPerObject->Release();       g_pCBPerObject       = nullptr; }
 	if ( g_pCBPerFrame )        { g_pCBPerFrame->Release();        g_pCBPerFrame        = nullptr; }
+	if ( g_pToonRampSRV )       { g_pToonRampSRV->Release();       g_pToonRampSRV       = nullptr; }
+	if ( g_pClampSampler )      { g_pClampSampler->Release();      g_pClampSampler      = nullptr; }
+	if ( g_pVertexShaderOutline ) { g_pVertexShaderOutline->Release(); g_pVertexShaderOutline = nullptr; }
+	if ( g_pPixelShaderOutline )  { g_pPixelShaderOutline->Release();  g_pPixelShaderOutline  = nullptr; }
+	if ( g_pPixelShaderToon )   { g_pPixelShaderToon->Release();   g_pPixelShaderToon   = nullptr; }
 	if ( g_pPixelShader )       { g_pPixelShader->Release();       g_pPixelShader       = nullptr; }
 	if ( g_pVertexShader )      { g_pVertexShader->Release();      g_pVertexShader      = nullptr; }
 	if ( g_pInputLayout )       { g_pInputLayout->Release();       g_pInputLayout       = nullptr; }

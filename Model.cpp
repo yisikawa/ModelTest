@@ -39,7 +39,7 @@ extern void convert_texture_path(char *path);
 extern	CPC			*pPC;
 extern	CNPC		*pNPC;
 extern	bool		g_mPCFlag;
-extern	bool		g_mDispWire,g_mDispIdl,g_mDispBone;
+extern	bool		g_mDispToon,g_mDispToon2,g_mDispBone;
 extern	int			g_mDispBoneNo,g_mShlBoneNoR,g_mShlBoneNoL;
 extern	char		g_meshPath[];
 extern	char		g_texPath[];
@@ -604,6 +604,29 @@ void CModel::InitialTransform(void)
 
 
 //======================================================================
+//		バインドポーズで行列更新（MirrorY適用済み）
+//		InitialTransform と同じボーン行列を構築した後、
+//		m_mRootTransform（MirrorY）を適用する。
+//		bmat = inv(bindPose) * bindPose * MirrorY = MirrorY となり、
+//		m_FlipFlag によるラスタライザー選択が正しく機能する。
+//======================================================================
+void CModel::BindPoseTransform(void)
+{
+	int i;
+
+	for (i = 0; i < m_nBone; i++)
+		m_Bones[i].m_mWorld = m_Bones[i].m_mTransform;
+	for (i = 0; i < m_nBone; i++)
+		if (m_Bones[i].m_pParent)
+			m_Bones[i].m_mWorld *= ((CBone*)m_Bones[i].m_pParent)->m_mWorld;
+	for (i = 0; i < m_nBone; i++) {
+		D3DXMatrixInverse(&m_Bones[i].m_mInvTrans, 0, &m_Bones[i].m_mWorld);
+		m_Bones[i].m_mWorld *= m_mRootTransform;
+	}
+}
+
+
+//======================================================================
 //		モデルの行列更新
 //		全フレームの行列を算出します。
 //======================================================================
@@ -681,10 +704,14 @@ unsigned long CModel::Rendering( void )
 
 	// ---- 固定シェーダー設定 ----
 	pCtx->VSSetShader( GetVertexShader(), nullptr, 0 );
-	pCtx->PSSetShader( GetPixelShader(),  nullptr, 0 );
+	pCtx->PSSetShader( g_mDispToon ? GetPixelShaderToon() : GetPixelShader(), nullptr, 0 );
 	pCtx->IASetInputLayout( GetInputLayout() );
 	ID3D11SamplerState *pSmp = GetLinearSampler();
 	pCtx->PSSetSamplers( 0, 1, &pSmp );
+	ID3D11ShaderResourceView *pRamp = GetToonRampSRV();
+	pCtx->PSSetShaderResources( 2, 1, &pRamp );
+	ID3D11SamplerState *pClampSmp = GetClampSampler();
+	pCtx->PSSetSamplers( 2, 1, &pClampSmp );
 
 	CMesh *pMesh = (CMesh*)m_Meshs.Top();
 	while ( pMesh != NULL )
@@ -737,23 +764,39 @@ unsigned long CModel::Rendering( void )
 
 			pStream = (CStream*)pStream->Next;
 		}
+
+		// ---- 輪郭線パス(背面法): 押し出しVS + 前面カリングで背面のみ描画 ----
+		if ( g_mDispToon2 ) {
+			pCtx->VSSetShader( GetVertexShaderOutline(), nullptr, 0 );
+			pCtx->PSSetShader( GetPixelShaderOutline(),  nullptr, 0 );
+			pCtx->RSSetState( pMesh->m_FlipFlag ? GetRasterizerFrontCullFlipped() : GetRasterizerFrontCull() );
+
+			pStream = (CStream*)pMesh->m_Streams.Top();
+			while ( pStream != NULL ) {
+				int DispLevel = pStream->GetDispLevel();
+				if ( g_mPCFlag && DispLevel != 0 && DispLevel < DispCheck ) {
+					pStream = (CStream*)pStream->Next;
+					continue;
+				}
+				pCtx->IASetPrimitiveTopology( pStream->m_PrimitiveType );
+				CMaterial *pMat = pStream->m_pMaterial;
+				ID3D11ShaderResourceView *pSRV = pMat ? pMat->GetTexture() : nullptr;
+				pCtx->PSSetShaderResources( 0, 1, &pSRV );
+				UINT indexCount = ( pStream->m_PrimitiveType == D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP )
+					? pStream->GetFaceCount() + 2
+					: pStream->GetFaceCount() * 3;
+				pCtx->DrawIndexed( indexCount, (UINT)pStream->GetIndexStart(), 0 );
+				pStream = (CStream*)pStream->Next;
+			}
+			// 通常シェーダーへ復帰(RSは次メッシュ先頭で再設定される)
+			pCtx->VSSetShader( GetVertexShader(), nullptr, 0 );
+			pCtx->PSSetShader( g_mDispToon ? GetPixelShaderToon() : GetPixelShader(), nullptr, 0 );
+		}
 		count += pMesh->m_NumFaces;
 		pMesh = (CMesh*)pMesh->Next;
 	}
 	return count;
 }
-
-//======================================================================
-//
-//		レンダリング
-//
-//		ボーンデータをレンダリングします。
-//======================================================================
-void CModel::BoneRendering( void )
-{
-	// TODO Phase5: ボーン描画は専用ラインシェーダーが必要。現在は未実装。
-}
-
 
 //======================================================================
 //

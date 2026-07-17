@@ -44,9 +44,12 @@ void    UnInitRender( void );
 void    Rendering( void );
 bool    Create3DSpace( void );
 void    UpdateProjection( void );
+bool    SaveOrthographicViews( const char* outDir );
 class   CModel;
 CModel* GetActiveModel();
 
 struct ID3D11RasterizerState;
 ID3D11RasterizerState* GetRasterizerNormal( void );
 ID3D11RasterizerState* GetRasterizerFlipped( void );
+ID3D11RasterizerState* GetRasterizerFrontCull( void );
+ID3D11RasterizerState* GetRasterizerFrontCullFlipped( void );
