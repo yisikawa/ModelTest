@@ -607,11 +607,12 @@ bool InitShaders( void )
 	//==============================================================================
 	{
 		const float floorY = -0.001f;
+		// 大型モデル（翼を広げた大鳥など）の影が床からはみ出さないよう±10単位
 		float floorVerts[4][3] = {
-			{ -3.0f, floorY, -3.0f },
-			{ -3.0f, floorY,  3.0f },
-			{  3.0f, floorY, -3.0f },
-			{  3.0f, floorY,  3.0f },
+			{ -10.0f, floorY, -10.0f },
+			{ -10.0f, floorY,  10.0f },
+			{  10.0f, floorY, -10.0f },
+			{  10.0f, floorY,  10.0f },
 		};
 		D3D11_BUFFER_DESC vbd = {};
 		vbd.ByteWidth = sizeof(floorVerts);
