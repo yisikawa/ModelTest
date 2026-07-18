@@ -650,6 +650,38 @@ void CModel::DynamicTransform(void)
 
 //======================================================================
 //
+//		ボーンワールドAABB算出
+//
+//		DynamicTransform() 適用後のボーンワールド位置を包含する
+//		AABBを返します。シャドウ視錐台のフィットに使用します。
+//		頂点はGPUスキニングのためCPU側に無く、ボーン位置で代用します
+//		（骨から離れた頂点分は呼び出し側でパディングを加えること）。
+//
+//	output
+//		true: vMin/vMax 有効	false: ボーンなし
+//
+//======================================================================
+bool CModel::GetBoneWorldAABB( D3DXVECTOR3 &vMin, D3DXVECTOR3 &vMax )
+{
+	if ( m_nBone <= 0 ) return false;
+
+	vMin = D3DXVECTOR3(  FLT_MAX,  FLT_MAX,  FLT_MAX );
+	vMax = D3DXVECTOR3( -FLT_MAX, -FLT_MAX, -FLT_MAX );
+	for ( int i = 0; i < m_nBone; i++ ) {
+		const D3DXMATRIX &m = m_Bones[i].m_mWorld;
+		vMin.x = vMin.x < m._41 ? vMin.x : m._41;
+		vMin.y = vMin.y < m._42 ? vMin.y : m._42;
+		vMin.z = vMin.z < m._43 ? vMin.z : m._43;
+		vMax.x = vMax.x > m._41 ? vMax.x : m._41;
+		vMax.y = vMax.y > m._42 ? vMax.y : m._42;
+		vMax.z = vMax.z > m._43 ? vMax.z : m._43;
+	}
+	return true;
+}
+
+
+//======================================================================
+//
 //		フレームの最大時間を算出
 //
 //		全フレームの行列を算出します。

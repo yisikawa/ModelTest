@@ -558,6 +558,7 @@ public:
 	virtual void	InitialTransform(void);
 	virtual void	BindPoseTransform(void);
 	virtual void	DynamicTransform(void);
+	virtual bool	GetBoneWorldAABB( D3DXVECTOR3 &vMin, D3DXVECTOR3 &vMax );
 	virtual unsigned long Rendering(void);
 	virtual void	ShadowRendering(void);
 	virtual void	RotateZero( D3DXMATRIX *mat );
