@@ -44,6 +44,10 @@ float ComputeShadow(float4 posLightSpace)
     if (saturate(shadowUV.x) != shadowUV.x || saturate(shadowUV.y) != shadowUV.y)
         return 1.0f;
 
+    // ライト空間の深度範囲外（far面より奥）は影なし扱い
+    if (projCoord.z > 1.0f)
+        return 1.0f;
+
     return SampleShadow3x3(shadowUV, projCoord.z - shadowBias);
 }
 
