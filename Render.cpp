@@ -82,6 +82,60 @@ CModel* GetActiveModel() {
 	return g_mPCFlag ? (CModel*)pPC : (CModel*)pNPC;
 }
 
+//======================================================================
+//
+//		シャドウ用ライト行列の更新
+//
+//		モデルのボーンAABBを包含する境界球にライトの視点位置と
+//		正射影サイズを毎フレームフィットさせます。固定4x4視錐台では
+//		大型モデル（翼を広げた大鳥など）の末端がクリップされ、
+//		シャドウマップに深度が書かれず影が欠けるため。
+//
+//======================================================================
+static void UpdateShadowLightMatrices( CModel *pModel )
+{
+	D3DXVECTOR3 vMin, vMax;
+
+	if ( pModel == NULL || !pModel->GetBoneWorldAABB( vMin, vMax ) ) {
+		// フォールバック: 従来の固定視錐台（4x4単位・距離1.5）
+		g_mLightPosition = g_mAt + g_mLightDist * (-g_mLight.Direction);
+		D3DXMatrixLookAtLH( &g_mViewLight, &g_mLightPosition, &g_mAt, &g_mUp );
+		XMStoreFloat4x4( (XMFLOAT4X4*)&g_mProjLight,
+		                 XMMatrixOrthographicLH( 4.0f, 4.0f, 0.1f, 10.0f ) );
+		return;
+	}
+
+	// ボーン位置AABBは頂点（羽先・髪など）を含まないため余白を加える
+	D3DXVECTOR3 ext = vMax - vMin;
+	float maxExt = ext.x > ext.y ? ext.x : ext.y;
+	maxExt = maxExt > ext.z ? maxExt : ext.z;
+	float pad = maxExt * 0.35f;
+	pad = pad > 0.5f ? pad : 0.5f;
+	vMin -= D3DXVECTOR3( pad, pad, pad );
+	vMax += D3DXVECTOR3( pad, pad, pad );
+
+	// AABBを包含する境界球
+	D3DXVECTOR3 center = ( vMin + vMax ) * 0.5f;
+	D3DXVECTOR3 half   = ( vMax - vMin ) * 0.5f;
+	float radius = D3DXVec3Length( &half );
+
+	// ライト視点: 境界球の外側 (radius + 1.0) からモデル中心を見る
+	float dist = radius + 1.0f;
+	g_mLightPosition = center + dist * (-g_mLight.Direction);
+
+	// ライトがほぼ真下向きだと up=(0,1,0) と視線が平行になり
+	// LookAt が退化するため、そのときは Z 軸を up に使う
+	D3DXVECTOR3 up = ( fabsf( g_mLight.Direction.y ) > 0.99f )
+	               ? D3DXVECTOR3( 0.f, 0.f, 1.f ) : g_mUp;
+	D3DXMatrixLookAtLH( &g_mViewLight, &g_mLightPosition, &center, &up );
+
+	// far: 中心の先 radius 分に加え、床(y=0)まで届く距離と余白を確保
+	float centerY = center.y > 0.f ? center.y : 0.f;
+	float farZ = dist + radius + centerY + 2.0f;
+	XMStoreFloat4x4( (XMFLOAT4X4*)&g_mProjLight,
+	                 XMMatrixOrthographicLH( radius * 2.0f, radius * 2.0f, 0.1f, farZ ) );
+}
+
 void Rendering( void )
 {
 	D3DXVECTOR3		Pos;
@@ -99,33 +153,20 @@ void Rendering( void )
 	// レンダリング
 	//-----------------------------------------------
 	unsigned long poly = 0;
-	//	ライト位置の計算
-	g_mLightPosition = g_mAt + g_mLightDist * (-g_mLight.Direction);
-	D3DXMatrixLookAtLH( &g_mViewLight, &g_mLightPosition, &g_mAt, &g_mUp );
 
 	pPC->GetWorldPosition( Pos );
-	if (g_mPCFlag) {
-		if (g_mAnimPlaying) pPC->AddTime(fTime*g_mMotionSpeed);
-		pPC->DynamicTransform();
-		//pPC->DynamicTransform2();
-		// Pass1: シャドウパス
-		BeginShadowPass();
-		pPC->ShadowRendering();
-		EndShadowPass();
-		// Pass2: メインパス
-		poly += pPC->Rendering();
-	}
-	else {
-		if (g_mAnimPlaying) pNPC->AddTime( fTime*g_mMotionSpeed );
-		pNPC->DynamicTransform();
-		//pNPC->DynamicTransform2();
-		// Pass1: シャドウパス
-		BeginShadowPass();
-		pNPC->ShadowRendering();
-		EndShadowPass();
-		// Pass2: メインパス
-		poly += pNPC->Rendering();
-	}
+	CModel *pModel = GetActiveModel();
+	if (g_mAnimPlaying) pModel->AddTime( fTime*g_mMotionSpeed );
+	pModel->DynamicTransform();
+	//pModel->DynamicTransform2();
+	// ライト行列更新（ボーン行列確定後にモデルAABBへ視錐台をフィット）
+	UpdateShadowLightMatrices( pModel );
+	// Pass1: シャドウパス
+	BeginShadowPass();
+	pModel->ShadowRendering();
+	EndShadowPass();
+	// Pass2: メインパス
+	poly += pModel->Rendering();
 	// Pass3: シャドウキャッチャー床（半透明。CBPerFrameは直前のモデル描画で更新済み）
 	RenderFloorShadow();
 	AdDrawPolygons( poly );
